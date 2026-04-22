@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Deal {
+  id                String                  @id @default(cuid())
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  status            DealStatus              @default(PENDING)
+  requestedAmount   Float
+  approvedAmount    Float?
+  factorRate        Float?
+  termDays          Int?
+  brokerContactId   String?
+  merchantContactId String?
+  brokerContact     BrokerContact?          @relation(fields: [brokerContactId], references: [id])
+  merchantContact   MerchantContact?        @relation(fields: [merchantContactId], references: [id])
+  offers            Offer[]
+  bankConnections   BankConnectionRecord[]
+  identityRecords   IdentityVerificationRecord[]
+  agreements        AgreementRecord[]
+  notifications     NotificationLog[]
+  underwritingDecisions UnderwritingDecision[]
+}
+
+enum DealStatus {
+  PENDING
+  UNDERWRITING
+  APPROVED
+  DECLINED
+  FUNDED
+  CLOSED
+}
+
+model Offer {
+  id              String          @id @default(cuid())
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  dealId          String
+  deal            Deal            @relation(fields: [dealId], references: [id])
+  amount          Float
+  factorRate      Float
+  termDays        Int
+  paymentFrequency String
+  status          OfferStatus     @default(PENDING)
+  expiresAt       DateTime?
+  snapshots       OfferSnapshot[]
+}
+
+enum OfferStatus {
+  PENDING
+  SENT
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+model OfferSnapshot {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  offerId   String
+  offer     Offer    @relation(fields: [offerId], references: [id])
+  data      Json
+}
+
+model BrokerContact {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  clerkId   String?  @unique
+  name      String
+  email     String   @unique
+  phone     String?
+  company   String?
+  deals     Deal[]
+}
+
+model MerchantContact {
+  id           String   @id @default(cuid())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  clerkId      String?  @unique
+  businessName String
+  ownerName    String
+  email        String   @unique
+  phone        String?
+  ein          String?
+  deals        Deal[]
+}
+
+model BankConnectionRecord {
+  id               String   @id @default(cuid())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  dealId           String
+  deal             Deal     @relation(fields: [dealId], references: [id])
+  plaidAccessToken String?
+  plaidItemId      String?
+  institutionName  String?
+  status           String   @default("PENDING")
+  rawData          Json?
+}
+
+model IdentityVerificationRecord {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  dealId      String
+  deal        Deal     @relation(fields: [dealId], references: [id])
+  provider    String   @default("persona")
+  inquiryId   String?
+  status      String   @default("PENDING")
+  completedAt DateTime?
+  rawData     Json?
+}
+
+model AgreementRecord {
+  id           String    @id @default(cuid())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  dealId       String
+  deal         Deal      @relation(fields: [dealId], references: [id])
+  provider     String    @default("dropbox_sign")
+  signatureRequestId String?
+  status       String    @default("PENDING")
+  signedAt     DateTime?
+  documentUrl  String?
+  rawData      Json?
+}
+
+model NotificationLog {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  dealId    String?
+  deal      Deal?    @relation(fields: [dealId], references: [id])
+  channel   String
+  recipient String
+  subject   String?
+  status    String   @default("SENT")
+  rawData   Json?
+}
+
+model UnderwritingDecision {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  dealId      String
+  deal        Deal     @relation(fields: [dealId], references: [id])
+  decision    String
+  score       Float?
+  reasons     Json?
+  decidedBy   String?
+  notes       String?
+}
