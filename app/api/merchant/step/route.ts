@@ -36,9 +36,9 @@ export async function GET(request: NextRequest) {
   }
 
   const completedSteps = {
-    identity: deal.identityRecords.some((r) => r.status === 'COMPLETE'),
-    bank_connection: deal.bankConnections.some((r) => r.status === 'ACTIVE'),
-    agreement: deal.agreements.some((r) => r.status === 'SIGNED'),
+    identity: deal.identityRecords.some((r: { status: string }) => r.status === 'COMPLETE'),
+    bank_connection: deal.bankConnections.some((r: { status: string }) => r.status === 'ACTIVE'),
+    agreement: deal.agreements.some((r: { status: string }) => r.status === 'SIGNED'),
   }
 
   const nextStep = VALID_STEPS.find(
