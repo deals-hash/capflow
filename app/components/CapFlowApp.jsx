@@ -83,6 +83,47 @@ const STATUS_COLORS = {
   "Funded": "#16a34a",
 };
 
+// ─── API HELPERS ──────────────────────────────────────────────────────────────
+function mapDeal(d) {
+  return {
+    id: d.id,
+    status: d.status,
+    created: d.createdAt ? d.createdAt.split('T')[0] : '',
+    merchant: d.merchantContact
+      ? { name: d.merchantContact.businessName, email: d.merchantContact.email, phone: d.merchantContact.phone || '' }
+      : { name: '', email: '', phone: '' },
+    broker: d.brokerContact
+      ? { name: d.brokerContact.name, email: d.brokerContact.email }
+      : { name: '', email: '' },
+    offers: (d.offers || []).map(o => ({
+      id: o.id,
+      amount: o.amount,
+      payback: Math.round(o.amount * o.factorRate),
+      factor: o.factorRate,
+      term: o.termDays,
+      frequency: o.paymentFrequency,
+      position: '1st',
+      fee: 1,
+      expiry: o.expiresAt ? o.expiresAt.split('T')[0] : '',
+      commissionPct: 10,
+    })),
+    selectedOffer: null,
+    bankStatus: null,
+    idvStatus: null,
+    agreementSigned: false,
+    uwDecision: null,
+    fundingCallDone: false,
+  };
+}
+
+function patchDeal(id, data) {
+  return fetch(`/api/deals/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).catch(console.error);
+}
+
 // ─── ICONS (inline SVG) ───────────────────────────────────────────────────────
 const Icon = ({ name, size = 16, color = "currentColor" }) => {
   const icons = {
@@ -116,6 +157,7 @@ const Icon = ({ name, size = 16, color = "currentColor" }) => {
 // ─── STYLES ───────────────────────────────────────────────────────────────────
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  @keyframes spin { to { transform: rotate(360deg); } }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -1382,7 +1424,8 @@ const NotificationsPanel = ({ deals }) => {
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [deals, setDeals] = useState(MOCK_DEALS);
+  const [deals, setDeals] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [view, setView] = useState("dashboard");
   const [selectedDeal, setSelectedDeal] = useState(null);
   const [showNewDeal, setShowNewDeal] = useState(false);
@@ -1393,40 +1436,58 @@ export default function App() {
 
   const notify = (msg) => setToast(msg);
 
+  useEffect(() => {
+    fetch('/api/deals')
+      .then(r => r.json())
+      .then(data => { setDeals(Array.isArray(data) ? data.map(mapDeal) : []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
   const updateDealStatus = (id, status) => {
     setDeals(ds => ds.map(d => d.id === id ? { ...d, status } : d));
+    patchDeal(id, { status });
     notify(`Deal ${id} → ${status}`);
   };
 
   const deleteDeal = (id) => {
     setDeals(ds => ds.filter(d => d.id !== id));
+    fetch(`/api/deals/${id}`, { method: 'DELETE' }).catch(console.error);
     notify(`Deal ${id} deleted.`);
+  };
+
+  const handleCreate = (dealData) => {
+    fetch('/api/deals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dealData) })
+      .then(r => r.json())
+      .then(saved => { setDeals(ds => [mapDeal(saved), ...ds]); notify(`Deal created!`); })
+      .catch(() => notify('Failed to create deal'));
   };
 
   const handleBrokerSelect = (id, offerId) => {
     setDeals(ds => ds.map(d => d.id === id ? { ...d, selectedOffer: offerId, status: "Offer Selected" } : d));
+    patchDeal(id, { status: "Offer Selected" });
     notify(`Offer selected for ${id}. Merchant will be notified.`);
   };
 
   const handleMerchantStep = (id, step) => {
-    setDeals(ds => ds.map(d => {
-      if (d.id !== id) return d;
-      let update = {};
-      if (step === "bank") { update = { bankStatus: "connected", status: "Bank Connected" }; }
-      if (step === "idv") { update = { idvStatus: "pass", status: "Identity Verified" }; }
-      if (step === "sign") {
-        update = { agreementSigned: true, status: "Agreement Signed" };
-        setTimeout(() => {
-          setDeals(ds2 => ds2.map(d2 => d2.id === id && d2.status === "Agreement Signed" ? { ...d2, status: "Ready for Final UW" } : d2));
-          notify(`${id} is now Ready for Final UW!`);
-        }, 800);
-      }
-      return { ...d, ...update };
-    }));
+    let update = {};
+    if (step === "bank") update = { bankStatus: "connected", status: "Bank Connected" };
+    if (step === "idv") update = { idvStatus: "pass", status: "Identity Verified" };
+    if (step === "sign") {
+      update = { agreementSigned: true, status: "Agreement Signed" };
+      setTimeout(() => {
+        setDeals(ds2 => ds2.map(d2 => d2.id === id && d2.status === "Agreement Signed" ? { ...d2, status: "Ready for Final UW" } : d2));
+        patchDeal(id, { status: "Ready for Final UW" });
+        notify(`${id} is now Ready for Final UW!`);
+      }, 800);
+    }
+    setDeals(ds => ds.map(d => d.id === id ? { ...d, ...update } : d));
+    if (update.status) patchDeal(id, { status: update.status });
   };
 
   const handleUWDecide = (id, decision) => {
-    setDeals(ds => ds.map(d => d.id === id ? { ...d, uwDecision: decision, status: decision === "approved" ? "UW Approved" : "UW Declined" } : d));
+    const status = decision === "approved" ? "UW Approved" : "UW Declined";
+    setDeals(ds => ds.map(d => d.id === id ? { ...d, uwDecision: decision, status } : d));
+    patchDeal(id, { status });
     notify(`Deal ${id} ${decision === "approved" ? "APPROVED ✓" : "DECLINED ✗"}`);
   };
 
@@ -1489,10 +1550,18 @@ export default function App() {
             </div>
           </div>
           <div className="content scrollbar">
-            {view === "dashboard" && <Dashboard deals={deals} onSelectDeal={d => { setSelectedDeal(d); }} />}
-            {view === "deals" && <DealsList deals={deals} onSelectDeal={d => setSelectedDeal(d)} onNewDeal={() => setShowNewDeal(true)} onDeleteDeal={deleteDeal} />}
-            {view === "uwqueue" && <UWQueue deals={deals} onOpen={d => setUwDeal(d)} />}
-            {view === "alerts" && <NotificationsPanel deals={deals} />}
+            {loading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                <div style={{ width: 40, height: 40, border: '4px solid #334155', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+              </div>
+            ) : (
+              <>
+                {view === "dashboard" && <Dashboard deals={deals} onSelectDeal={d => { setSelectedDeal(d); }} />}
+                {view === "deals" && <DealsList deals={deals} onSelectDeal={d => setSelectedDeal(d)} onNewDeal={() => setShowNewDeal(true)} onDeleteDeal={deleteDeal} />}
+                {view === "uwqueue" && <UWQueue deals={deals} onOpen={d => setUwDeal(d)} />}
+                {view === "alerts" && <NotificationsPanel deals={deals} />}
+              </>
+            )}
           </div>
         </main>
       </div>
@@ -1512,7 +1581,7 @@ export default function App() {
       {showNewDeal && (
         <NewDealModal
           onClose={() => setShowNewDeal(false)}
-          onCreate={d => { setDeals(ds => [d, ...ds]); notify(`Deal ${d.id} created!`); }}
+          onCreate={handleCreate}
         />
       )}
       {brokerDeal && (

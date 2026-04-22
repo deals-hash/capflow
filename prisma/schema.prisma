@@ -12,7 +12,7 @@ model Deal {
   id                String                  @id @default(cuid())
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @updatedAt
-  status            DealStatus              @default(PENDING)
+  status            String                  @default("Offer Created")
   requestedAmount   Float
   approvedAmount    Float?
   factorRate        Float?
@@ -29,14 +29,6 @@ model Deal {
   underwritingDecisions UnderwritingDecision[]
 }
 
-enum DealStatus {
-  PENDING
-  UNDERWRITING
-  APPROVED
-  DECLINED
-  FUNDED
-  CLOSED
-}
 
 model Offer {
   id              String          @id @default(cuid())

@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get('status')
 
   const deals = await prisma.deal.findMany({
-    where: status ? { status: status as any } : undefined,
+    where: status ? { status } : undefined,
     include: {
       brokerContact: true,
       merchantContact: true,
@@ -31,22 +31,56 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json()
-  const { requestedAmount, brokerContactId, merchantContactId } = body
+  const { merchant, broker, offers: offerData, status } = body
 
+  // Full UI shape — create/upsert contacts and offers inline
+  if (merchant?.email && broker?.email) {
+    const [brokerContact, merchantContact] = await Promise.all([
+      prisma.brokerContact.upsert({
+        where: { email: broker.email },
+        update: { name: broker.name },
+        create: { name: broker.name, email: broker.email },
+      }),
+      prisma.merchantContact.upsert({
+        where: { email: merchant.email },
+        update: { businessName: merchant.name, ownerName: merchant.name, phone: merchant.phone ?? null },
+        create: { businessName: merchant.name, ownerName: merchant.name, email: merchant.email, phone: merchant.phone ?? null },
+      }),
+    ])
+
+    const firstAmount = offerData?.[0]?.amount ? parseFloat(offerData[0].amount) : 0
+
+    const deal = await prisma.deal.create({
+      data: {
+        requestedAmount: firstAmount,
+        status: status ?? 'Offer Created',
+        brokerContactId: brokerContact.id,
+        merchantContactId: merchantContact.id,
+        offers: offerData?.length ? {
+          create: offerData.map((o: Record<string, string>) => ({
+            amount: parseFloat(o.amount) || 0,
+            factorRate: parseFloat(o.factor) || 1,
+            termDays: parseInt(o.term) || 1,
+            paymentFrequency: o.frequency || 'Daily',
+            expiresAt: o.expiry ? new Date(o.expiry) : null,
+          })),
+        } : undefined,
+      },
+      include: { brokerContact: true, merchantContact: true, offers: true },
+    })
+
+    return Response.json(deal, { status: 201 })
+  }
+
+  // Simple shape — just requestedAmount + optional contact IDs
+  const { requestedAmount, brokerContactId, merchantContactId } = body
   if (!requestedAmount) {
     return Response.json({ error: 'requestedAmount is required' }, { status: 400 })
   }
 
   const deal = await prisma.deal.create({
-    data: {
-      requestedAmount,
-      brokerContactId,
-      merchantContactId,
-    },
-    include: {
-      brokerContact: true,
-      merchantContact: true,
-    },
+    data: { requestedAmount, brokerContactId, merchantContactId },
+    include: { brokerContact: true, merchantContact: true, offers: true },
   })
 
   return Response.json(deal, { status: 201 })
