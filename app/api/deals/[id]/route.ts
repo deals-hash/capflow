@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import type { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { sendBrokerOfferEmail, sendMerchantInviteEmail } from '@/lib/email'
 
 export async function GET(
   _request: NextRequest,
@@ -55,6 +56,28 @@ export async function PATCH(
       offers: true,
     },
   })
+
+  const status = body?.status as string | undefined
+
+  if (status === 'Offer Sent to Broker' && deal.brokerContact) {
+    const amount = deal.offers[0]?.amount ?? deal.requestedAmount
+    sendBrokerOfferEmail({
+      dealId: deal.id,
+      brokerName: deal.brokerContact.name,
+      brokerEmail: deal.brokerContact.email,
+      merchantName: deal.merchantContact?.businessName ?? 'Merchant',
+      amount,
+    }).catch(console.error)
+  }
+
+  if (status === 'Merchant Invited' && deal.merchantContact) {
+    sendMerchantInviteEmail({
+      dealId: deal.id,
+      merchantName: deal.merchantContact.ownerName,
+      merchantEmail: deal.merchantContact.email,
+      amount: deal.requestedAmount,
+    }).catch(console.error)
+  }
 
   return Response.json(deal)
 }
