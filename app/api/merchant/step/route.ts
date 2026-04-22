@@ -1,8 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
-import { PrismaClient } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import type { NextRequest } from 'next/server'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/prisma'
 
 const VALID_STEPS = [
   'identity',
@@ -77,7 +76,7 @@ export async function POST(request: NextRequest) {
           provider: 'persona',
           inquiryId: (data?.inquiryId as string) ?? null,
           status: 'PENDING',
-          rawData: data ?? {},
+          rawData: (data ?? {}) as Prisma.InputJsonValue,
         },
       })
       break
@@ -89,7 +88,7 @@ export async function POST(request: NextRequest) {
           plaidItemId: (data?.itemId as string) ?? null,
           institutionName: (data?.institutionName as string) ?? null,
           status: 'PENDING',
-          rawData: data ?? {},
+          rawData: (data ?? {}) as Prisma.InputJsonValue,
         },
       })
       break
@@ -101,7 +100,7 @@ export async function POST(request: NextRequest) {
           provider: 'dropbox_sign',
           signatureRequestId: (data?.signatureRequestId as string) ?? null,
           status: 'PENDING',
-          rawData: data ?? {},
+          rawData: (data ?? {}) as Prisma.InputJsonValue,
         },
       })
       break
