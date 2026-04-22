@@ -1,5 +1,4 @@
 import { auth } from '@clerk/nextjs/server'
-import { Prisma } from '@prisma/client'
 import type { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
@@ -76,7 +75,7 @@ export async function POST(request: NextRequest) {
           provider: 'persona',
           inquiryId: (data?.inquiryId as string) ?? null,
           status: 'PENDING',
-          rawData: (data ?? {}) as Prisma.InputJsonValue,
+          rawData: JSON.parse(JSON.stringify(data ?? {})),
         },
       })
       break
@@ -88,7 +87,7 @@ export async function POST(request: NextRequest) {
           plaidItemId: (data?.itemId as string) ?? null,
           institutionName: (data?.institutionName as string) ?? null,
           status: 'PENDING',
-          rawData: (data ?? {}) as Prisma.InputJsonValue,
+          rawData: JSON.parse(JSON.stringify(data ?? {})),
         },
       })
       break
@@ -100,7 +99,7 @@ export async function POST(request: NextRequest) {
           provider: 'dropbox_sign',
           signatureRequestId: (data?.signatureRequestId as string) ?? null,
           status: 'PENDING',
-          rawData: (data ?? {}) as Prisma.InputJsonValue,
+          rawData: JSON.parse(JSON.stringify(data ?? {})),
         },
       })
       break
