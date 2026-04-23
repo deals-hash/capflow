@@ -1039,13 +1039,68 @@ const PlaidConnectButton = ({ dealId, onConnected }) => {
   );
 };
 
+const PersonaVerifyButton = ({ dealId, onVerified }) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleClick = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/persona/create-inquiry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dealId }),
+      });
+      if (!res.ok) throw new Error("Failed to create inquiry");
+      const { inquiryId } = await res.json();
+
+      const { Client } = await import("persona");
+      const client = new Client({
+        inquiryId,
+        environment: process.env.NEXT_PUBLIC_PERSONA_ENV ?? "sandbox",
+        onReady: () => { client.open(); setLoading(false); },
+        onComplete: async ({ inquiryId: completedId, status, fields }) => {
+          try {
+            await fetch("/api/persona/complete-inquiry", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ dealId, inquiryId: completedId, status, fields }),
+            });
+            onVerified();
+          } catch {
+            setError("Failed to save verification result. Please try again.");
+          }
+        },
+        onCancel: () => setLoading(false),
+        onError: (err) => {
+          console.error(err);
+          setError("Verification failed. Please try again.");
+          setLoading(false);
+        },
+      });
+    } catch {
+      setError("Failed to start identity check. Please try again.");
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+      {error && <div style={{ color: "var(--red, #ef4444)", fontSize: 13 }}>{error}</div>}
+      <button className="btn btn-primary" onClick={handleClick} disabled={loading}>
+        <Icon name="id" size={14} /> {loading ? "Loading…" : "Start Identity Check"}
+      </button>
+    </div>
+  );
+};
+
 const MerchantView = ({ deal, onClose, onComplete }) => {
   const [mStep, setMStep] = useState(0);
   const steps = ["Bank Connection", "Identity Verification", "Sign Agreement", "Complete"];
   const done = [deal.bankStatus === "connected", deal.idvStatus === "pass", deal.agreementSigned, false];
 
   const handleAction = () => {
-    if (mStep === 1) onComplete(deal.id, "idv");
     if (mStep === 2) onComplete(deal.id, "sign");
     if (mStep < 3) setMStep(s => s + 1);
   };
@@ -1053,6 +1108,11 @@ const MerchantView = ({ deal, onClose, onComplete }) => {
   const handleBankConnected = useCallback(() => {
     onComplete(deal.id, "bank");
     setMStep(1);
+  }, [deal.id, onComplete]);
+
+  const handleIdvVerified = useCallback(() => {
+    onComplete(deal.id, "idv");
+    setMStep(2);
   }, [deal.id, onComplete]);
 
   const stepContent = [
@@ -1134,7 +1194,10 @@ const MerchantView = ({ deal, onClose, onComplete }) => {
           {mStep === 0 && (
             <PlaidConnectButton dealId={deal.id} onConnected={handleBankConnected} />
           )}
-          {mStep > 0 && s.action && (
+          {mStep === 1 && (
+            <PersonaVerifyButton dealId={deal.id} onVerified={handleIdvVerified} />
+          )}
+          {mStep >= 2 && s.action && (
             <button className="btn btn-primary" onClick={handleAction}>
               <Icon name={s.icon} size={14} /> {s.action}
             </button>
