@@ -662,6 +662,11 @@ const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOp
                 <Icon name="eye" size={15} /> Preview Broker Link
               </button>
             )}
+            {deal.status === "Offer Sent to Broker" && (
+              <button className="btn btn-primary" onClick={() => { onUpdate(deal.id, "Offer Sent to Broker"); onClose(); }}>
+                <Icon name="send" size={15} /> Resend Broker Link
+              </button>
+            )}
             {deal.status === "Offer Selected" && (
               <button className="btn btn-primary" onClick={() => { onUpdate(deal.id, "Merchant Invited"); onClose(); }}>
                 <Icon name="send" size={15} /> Send Merchant Onboarding
@@ -670,6 +675,11 @@ const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOp
             {["Merchant Invited", "Bank Connected", "Identity Verified", "Agreement Signed"].includes(deal.status) && (
               <button className="btn btn-secondary" onClick={() => onOpenMerchant(deal)}>
                 <Icon name="eye" size={15} /> Preview Merchant Flow
+              </button>
+            )}
+            {deal.status === "Merchant Invited" && (
+              <button className="btn btn-primary" onClick={() => { onUpdate(deal.id, "Merchant Invited"); onClose(); }}>
+                <Icon name="send" size={15} /> Resend Merchant Link
               </button>
             )}
             {deal.status === "Ready for Final UW" && (
