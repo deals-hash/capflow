@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { usePlaidLink } from "react-plaid-link";
 
 // ─── MOCK DATA ────────────────────────────────────────────────────────────────
 const MOCK_DEALS = [
@@ -994,17 +995,65 @@ const BrokerView = ({ deal, onClose, onSelect }) => {
 };
 
 // ─── MERCHANT ONBOARDING VIEW ─────────────────────────────────────────────────
+const PlaidConnectButton = ({ dealId, onConnected }) => {
+  const [linkToken, setLinkToken] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    fetch("/api/plaid/create-link-token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dealId }) })
+      .then(r => r.json())
+      .then(data => setLinkToken(data.link_token))
+      .catch(() => setError("Failed to initialise Plaid. Please try again."));
+  }, [dealId]);
+
+  const onSuccess = useCallback(async (public_token, metadata) => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/plaid/exchange-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ public_token, dealId, metadata }),
+      });
+      if (!res.ok) throw new Error("Exchange failed");
+      onConnected();
+    } catch {
+      setError("Bank connection failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [dealId, onConnected]);
+
+  const { open, ready } = usePlaidLink({ token: linkToken ?? "", onSuccess });
+
+  if (error) return <div style={{ color: "var(--red)", fontSize: 13 }}>{error}</div>;
+
+  return (
+    <button
+      className="btn btn-primary"
+      onClick={() => open()}
+      disabled={!ready || loading}
+    >
+      <Icon name="bank" size={14} /> {loading ? "Connecting…" : "Connect via Plaid"}
+    </button>
+  );
+};
+
 const MerchantView = ({ deal, onClose, onComplete }) => {
   const [mStep, setMStep] = useState(0);
   const steps = ["Bank Connection", "Identity Verification", "Sign Agreement", "Complete"];
   const done = [deal.bankStatus === "connected", deal.idvStatus === "pass", deal.agreementSigned, false];
 
   const handleAction = () => {
-    if (mStep === 0) onComplete(deal.id, "bank");
     if (mStep === 1) onComplete(deal.id, "idv");
     if (mStep === 2) onComplete(deal.id, "sign");
     if (mStep < 3) setMStep(s => s + 1);
   };
+
+  const handleBankConnected = useCallback(() => {
+    onComplete(deal.id, "bank");
+    setMStep(1);
+  }, [deal.id, onComplete]);
 
   const stepContent = [
     {
@@ -1082,7 +1131,10 @@ const MerchantView = ({ deal, onClose, onComplete }) => {
         </div>
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>Close</button>
-          {s.action && (
+          {mStep === 0 && (
+            <PlaidConnectButton dealId={deal.id} onConnected={handleBankConnected} />
+          )}
+          {mStep > 0 && s.action && (
             <button className="btn btn-primary" onClick={handleAction}>
               <Icon name={s.icon} size={14} /> {s.action}
             </button>
