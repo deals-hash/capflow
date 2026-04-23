@@ -1292,6 +1292,31 @@ const MerchantView = ({ deal, onClose, onComplete }) => {
 // ─── UW REVIEW MODAL ──────────────────────────────────────────────────────────
 const UWModal = ({ deal, onClose, onDecide }) => {
   const offer = deal.offers.find(o => o.id === deal.selectedOffer) || deal.offers[0];
+  const [fullDeal, setFullDeal] = useState(null);
+  const [loadingArtifacts, setLoadingArtifacts] = useState(true);
+
+  useEffect(() => {
+    fetch(`/api/deals/${deal.id}`)
+      .then(r => r.json())
+      .then(d => { setFullDeal(d); setLoadingArtifacts(false); })
+      .catch(() => setLoadingArtifacts(false));
+  }, [deal.id]);
+
+  const bank = fullDeal?.bankConnections?.[0] ?? null;
+  const idv = fullDeal?.identityRecords?.[0] ?? null;
+  const agreement = fullDeal?.agreements?.[0] ?? null;
+
+  const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+
+  const statusColor = (s) => {
+    if (!s) return 'var(--text3)';
+    const u = s.toUpperCase();
+    if (['CONNECTED', 'COMPLETED', 'SIGNED', 'PASSED', 'APPROVED'].includes(u)) return 'var(--green)';
+    if (['FAILED', 'DECLINED', 'DECLINED'].includes(u)) return 'var(--red)';
+    if (['REVIEW', 'PENDING'].includes(u)) return 'var(--amber, #f59e0b)';
+    return 'var(--text2)';
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
@@ -1320,32 +1345,84 @@ const UWModal = ({ deal, onClose, onDecide }) => {
               </div>
             </div>
             <div>
+              {/* Bank Connection */}
               <div className="uw-artifact">
                 <div className="uw-artifact-label">Bank Connection</div>
-                <div className="flex items-center gap-8">
-                  <Icon name="bank" size={16} color={deal.bankStatus ? "var(--green)" : "var(--text3)"} />
-                  <span className="fw-600 text-sm" style={{ color: deal.bankStatus ? "var(--green)" : "var(--text3)" }}>
-                    {deal.bankStatus ? "Connected & Verified" : "Not Connected"}
-                  </span>
-                </div>
+                {loadingArtifacts ? (
+                  <div className="text-sm text-muted">Loading…</div>
+                ) : bank ? (
+                  <>
+                    <div className="flex items-center gap-8" style={{ marginBottom: 6 }}>
+                      <Icon name="bank" size={15} color={statusColor(bank.status)} />
+                      <span className="fw-600 text-sm" style={{ color: statusColor(bank.status) }}>{bank.status}</span>
+                    </div>
+                    {bank.institutionName && (
+                      <div className="text-sm" style={{ marginBottom: 4 }}>Institution: <strong>{bank.institutionName}</strong></div>
+                    )}
+                    <div className="text-xs text-dim">Connected {fmtDate(bank.createdAt)}</div>
+                    {bank.plaidItemId && (
+                      <div className="mono text-xs text-dim mt-4" style={{ wordBreak: 'break-all' }}>Item ID: {bank.plaidItemId}</div>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex items-center gap-8">
+                    <Icon name="bank" size={15} color="var(--text3)" />
+                    <span className="text-sm" style={{ color: 'var(--text3)' }}>Not connected</span>
+                  </div>
+                )}
               </div>
+
+              {/* Identity Verification */}
               <div className="uw-artifact" style={{ marginTop: 10 }}>
                 <div className="uw-artifact-label">Identity Verification</div>
-                <div className="flex items-center gap-8">
-                  <Icon name="id" size={16} color={deal.idvStatus === "pass" ? "var(--green)" : "var(--text3)"} />
-                  <span className="fw-600 text-sm" style={{ color: deal.idvStatus === "pass" ? "var(--green)" : deal.idvStatus === "fail" ? "var(--red)" : "var(--text3)" }}>
-                    {deal.idvStatus ? deal.idvStatus.charAt(0).toUpperCase() + deal.idvStatus.slice(1) : "Pending"}
-                  </span>
-                </div>
+                {loadingArtifacts ? (
+                  <div className="text-sm text-muted">Loading…</div>
+                ) : idv ? (
+                  <>
+                    <div className="flex items-center gap-8" style={{ marginBottom: 6 }}>
+                      <Icon name="id" size={15} color={statusColor(idv.status)} />
+                      <span className="fw-600 text-sm" style={{ color: statusColor(idv.status) }}>{idv.status}</span>
+                    </div>
+                    {idv.inquiryId && (
+                      <div className="mono text-xs text-dim mt-4" style={{ wordBreak: 'break-all' }}>Inquiry: {idv.inquiryId}</div>
+                    )}
+                    <div className="text-xs text-dim mt-4">Completed {fmtDate(idv.completedAt)}</div>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-8">
+                    <Icon name="id" size={15} color="var(--text3)" />
+                    <span className="text-sm" style={{ color: 'var(--text3)' }}>Not verified</span>
+                  </div>
+                )}
               </div>
+
+              {/* Signed Agreement */}
               <div className="uw-artifact" style={{ marginTop: 10 }}>
                 <div className="uw-artifact-label">Signed Agreement</div>
-                <div className="flex items-center gap-8">
-                  <Icon name="sign" size={16} color={deal.agreementSigned ? "var(--green)" : "var(--text3)"} />
-                  <span className="fw-600 text-sm" style={{ color: deal.agreementSigned ? "var(--green)" : "var(--text3)" }}>
-                    {deal.agreementSigned ? "Signed & Stored" : "Awaiting Signature"}
-                  </span>
-                </div>
+                {loadingArtifacts ? (
+                  <div className="text-sm text-muted">Loading…</div>
+                ) : agreement ? (
+                  <>
+                    <div className="flex items-center gap-8" style={{ marginBottom: 6 }}>
+                      <Icon name="sign" size={15} color={statusColor(agreement.status)} />
+                      <span className="fw-600 text-sm" style={{ color: statusColor(agreement.status) }}>{agreement.status}</span>
+                    </div>
+                    <div className="text-xs text-dim mt-4">Signed {fmtDate(agreement.signedAt)}</div>
+                    {agreement.signatureRequestId && (
+                      <div className="mono text-xs text-dim mt-4" style={{ wordBreak: 'break-all' }}>Envelope: {agreement.signatureRequestId}</div>
+                    )}
+                    {agreement.documentUrl && (
+                      <a href={agreement.documentUrl} target="_blank" rel="noreferrer" className="text-xs mt-6" style={{ color: 'var(--accent)', display: 'inline-block' }}>
+                        View / Download Document ↗
+                      </a>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex items-center gap-8">
+                    <Icon name="sign" size={15} color="var(--text3)" />
+                    <span className="text-sm" style={{ color: 'var(--text3)' }}>Not signed</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
