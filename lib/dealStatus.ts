@@ -15,7 +15,7 @@ const UI_TO_DB: Record<string, string> = {
 
 const DB_TO_UI: Record<string, string> = {
   'PENDING':      'Offer Created',
-  'UNDERWRITING': 'Offer Sent to Broker',
+  'UNDERWRITING': 'Ready for Final UW',
   'APPROVED':     'UW Approved',
   'DECLINED':     'UW Declined',
   'FUNDED':       'Funded',
