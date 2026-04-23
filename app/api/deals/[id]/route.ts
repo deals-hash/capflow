@@ -2,7 +2,6 @@ import { auth } from '@clerk/nextjs/server'
 import type { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendBrokerOfferEmail, sendMerchantInviteEmail } from '@/lib/email'
-import { toDb, mapDealOut } from '@/lib/dealStatus'
 
 export async function GET(
   _request: NextRequest,
@@ -33,7 +32,7 @@ export async function GET(
     return Response.json({ error: 'Deal not found' }, { status: 404 })
   }
 
-  return Response.json(mapDealOut(deal as unknown as Record<string, unknown>))
+  return Response.json(deal)
 }
 
 export async function PATCH(
@@ -47,13 +46,10 @@ export async function PATCH(
 
   const { id } = await params
   const body = await request.json()
-  const uiStatus = body?.status as string | undefined
-
-  const dbData = uiStatus ? { ...body, status: toDb(uiStatus) } : body
 
   const deal = await prisma.deal.update({
     where: { id },
-    data: dbData,
+    data: body,
     include: {
       brokerContact: true,
       merchantContact: true,
@@ -61,7 +57,7 @@ export async function PATCH(
     },
   })
 
-  if (uiStatus === 'Offer Sent to Broker' && deal.brokerContact) {
+  if (body?.status === 'Offer Sent to Broker' && deal.brokerContact) {
     const amount = deal.offers[0]?.amount ?? deal.requestedAmount
     sendBrokerOfferEmail({
       dealId: deal.id,
@@ -72,7 +68,7 @@ export async function PATCH(
     }).catch(console.error)
   }
 
-  if (uiStatus === 'Merchant Invited' && deal.merchantContact) {
+  if (body?.status === 'Merchant Invited' && deal.merchantContact) {
     sendMerchantInviteEmail({
       dealId: deal.id,
       merchantName: deal.merchantContact.ownerName,
@@ -81,7 +77,7 @@ export async function PATCH(
     }).catch(console.error)
   }
 
-  return Response.json(mapDealOut(deal as unknown as Record<string, unknown>))
+  return Response.json(deal)
 }
 
 export async function DELETE(

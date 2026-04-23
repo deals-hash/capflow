@@ -1,7 +1,6 @@
 import { auth } from '@clerk/nextjs/server'
 import type { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { toDb } from '@/lib/dealStatus'
 
 export async function POST(request: NextRequest) {
   const { userId } = await auth()
@@ -27,7 +26,7 @@ export async function POST(request: NextRequest) {
     }),
     prisma.deal.update({
       where: { id: dealId },
-      data: { status: toDb('Identity Verified') },
+      data: { status: 'Identity Verified' },
     }),
   ])
 

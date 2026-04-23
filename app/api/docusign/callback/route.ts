@@ -1,6 +1,5 @@
 import type { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { toDb } from '@/lib/dealStatus'
 
 function closePopupHtml(event: string): string {
   return `<!DOCTYPE html>
@@ -41,7 +40,7 @@ export async function GET(request: NextRequest) {
       }),
       prisma.deal.update({
         where: { id: dealId },
-        data: { status: toDb('Agreement Signed') },
+        data: { status: 'Agreement Signed' },
       }),
     ]).catch(console.error)
   }
