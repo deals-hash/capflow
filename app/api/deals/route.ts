@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import type { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { toDb, mapDealOut } from '@/lib/dealStatus'
 
 export async function GET(request: NextRequest) {
   const { userId } = await auth()
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get('status')
 
   const deals = await prisma.deal.findMany({
-    where: status ? { status } : undefined,
+    where: status ? { status: toDb(status) } : undefined,
     include: {
       brokerContact: true,
       merchantContact: true,
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
     orderBy: { createdAt: 'desc' },
   })
 
-  return Response.json(deals)
+  return Response.json(deals.map(mapDealOut))
 }
 
 export async function POST(request: NextRequest) {
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
     const deal = await prisma.deal.create({
       data: {
         requestedAmount: firstAmount,
-        status: status ?? 'Offer Created',
+        status: toDb(status ?? 'Offer Created'),
         brokerContactId: brokerContact.id,
         merchantContactId: merchantContact.id,
         offers: offerData?.length ? {
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
       include: { brokerContact: true, merchantContact: true, offers: true },
     })
 
-    return Response.json(deal, { status: 201 })
+    return Response.json(mapDealOut(deal as unknown as Record<string, unknown>), { status: 201 })
   }
 
   // Simple shape — just requestedAmount + optional contact IDs
@@ -83,5 +84,5 @@ export async function POST(request: NextRequest) {
     include: { brokerContact: true, merchantContact: true, offers: true },
   })
 
-  return Response.json(deal, { status: 201 })
+  return Response.json(mapDealOut(deal as unknown as Record<string, unknown>), { status: 201 })
 }
