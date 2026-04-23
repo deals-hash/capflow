@@ -6,6 +6,7 @@ const isPublicRoute = createRouteMatcher([
   "/merchant(.*)",
   "/sign-in(.*)",
   "/sign-up(.*)",
+  "/api/docusign/callback",
 ]);
 
 export default clerkMiddleware(async (auth, request) => {

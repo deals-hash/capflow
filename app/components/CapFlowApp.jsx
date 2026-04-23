@@ -1095,6 +1095,74 @@ const PersonaVerifyButton = ({ dealId, onVerified }) => {
   );
 };
 
+const DocuSignButton = ({ dealId, onSigned }) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleClick = async () => {
+    setLoading(true);
+    setError(null);
+    let popup = null;
+
+    const onMessage = async (e) => {
+      if (e.origin !== window.location.origin) return;
+      if (!e.data || e.data.type !== 'docusign') return;
+      window.removeEventListener('message', onMessage);
+      if (popup && !popup.closed) popup.close();
+      if (e.data.event === 'signing_complete') {
+        onSigned();
+      } else {
+        setError('Signing was cancelled or declined. Please try again.');
+        setLoading(false);
+      }
+    };
+
+    try {
+      const res = await fetch('/api/docusign/create-envelope', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dealId }),
+      });
+      if (!res.ok) throw new Error('Failed to create signing envelope');
+      const { signingUrl } = await res.json();
+
+      const w = 900, h = 650;
+      const left = Math.max(0, (window.screen.width - w) / 2);
+      const top = Math.max(0, (window.screen.height - h) / 2);
+      popup = window.open(signingUrl, 'docusign_signing', `width=${w},height=${h},left=${left},top=${top},toolbar=0,menubar=0`);
+
+      if (!popup) {
+        setError('Popup blocked. Please allow popups for this site and try again.');
+        setLoading(false);
+        return;
+      }
+
+      window.addEventListener('message', onMessage);
+
+      // Fallback: if popup closes without sending a message, reset loading
+      const pollClosed = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(pollClosed);
+          window.removeEventListener('message', onMessage);
+          setLoading(false);
+        }
+      }, 500);
+    } catch {
+      setError('Failed to start signing. Please try again.');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+      {error && <div style={{ color: 'var(--red, #ef4444)', fontSize: 13 }}>{error}</div>}
+      <button className="btn btn-primary" onClick={handleClick} disabled={loading}>
+        <Icon name="sign" size={14} /> {loading ? 'Opening…' : 'Review & Sign'}
+      </button>
+    </div>
+  );
+};
+
 const MerchantView = ({ deal, onClose, onComplete }) => {
   const [mStep, setMStep] = useState(0);
   const steps = ["Bank Connection", "Identity Verification", "Sign Agreement", "Complete"];
@@ -1113,6 +1181,11 @@ const MerchantView = ({ deal, onClose, onComplete }) => {
   const handleIdvVerified = useCallback(() => {
     onComplete(deal.id, "idv");
     setMStep(2);
+  }, [deal.id, onComplete]);
+
+  const handleAgreementSigned = useCallback(() => {
+    onComplete(deal.id, "sign");
+    setMStep(3);
   }, [deal.id, onComplete]);
 
   const stepContent = [
@@ -1197,10 +1270,8 @@ const MerchantView = ({ deal, onClose, onComplete }) => {
           {mStep === 1 && (
             <PersonaVerifyButton dealId={deal.id} onVerified={handleIdvVerified} />
           )}
-          {mStep >= 2 && s.action && (
-            <button className="btn btn-primary" onClick={handleAction}>
-              <Icon name={s.icon} size={14} /> {s.action}
-            </button>
+          {mStep === 2 && (
+            <DocuSignButton dealId={deal.id} onSigned={handleAgreementSigned} />
           )}
         </div>
       </div>
