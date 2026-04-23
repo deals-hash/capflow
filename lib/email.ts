@@ -50,10 +50,13 @@ export async function sendBrokerOfferEmail({
 }) {
   const token = makeToken({ dealId, type: 'broker' })
   const link = `${appUrl()}/broker?token=${token}`
+  const to = resolveRecipient(brokerEmail)
 
-  return resend.emails.send({
+  console.log(`[email] sendBrokerOfferEmail → to=${to} deal=${dealId} merchant=${merchantName} amount=${amount}`)
+
+  const result = await resend.emails.send({
     from: FROM,
-    to: resolveRecipient(brokerEmail),
+    to,
     subject: `New Offer Ready — ${merchantName}`,
     html: `
       ${testBanner(brokerEmail)}
@@ -64,6 +67,9 @@ export async function sendBrokerOfferEmail({
       <p>This link expires in 7 days.</p>
     `,
   })
+
+  console.log(`[email] sendBrokerOfferEmail result:`, JSON.stringify(result))
+  return result
 }
 
 export async function sendMerchantInviteEmail({

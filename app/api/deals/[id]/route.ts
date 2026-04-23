@@ -95,7 +95,16 @@ export async function DELETE(
 
   const { id } = await params
 
-  await prisma.deal.delete({ where: { id } })
+  await prisma.$transaction([
+    prisma.offerSnapshot.deleteMany({ where: { offer: { dealId: id } } }),
+    prisma.offer.deleteMany({ where: { dealId: id } }),
+    prisma.bankConnectionRecord.deleteMany({ where: { dealId: id } }),
+    prisma.identityVerificationRecord.deleteMany({ where: { dealId: id } }),
+    prisma.agreementRecord.deleteMany({ where: { dealId: id } }),
+    prisma.notificationLog.deleteMany({ where: { dealId: id } }),
+    prisma.underwritingDecision.deleteMany({ where: { dealId: id } }),
+    prisma.deal.delete({ where: { id } }),
+  ])
 
   return new Response(null, { status: 204 })
 }
