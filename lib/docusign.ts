@@ -106,6 +106,19 @@ function buildAgreementHtml(params: {
 </html>`
 }
 
+export async function getEnvelopeDocument(envelopeId: string, documentId: string): Promise<{ data: ArrayBuffer; contentType: string }> {
+  const token = await getAccessToken()
+  const base = process.env.DOCUSIGN_BASE_URL!
+  const accountId = process.env.DOCUSIGN_ACCOUNT_ID!
+  const url = `${base}/v2.1/accounts/${accountId}/envelopes/${envelopeId}/documents/${documentId}`
+
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  if (!res.ok) throw new Error(`DocuSign document fetch failed: ${res.status} ${await res.text()}`)
+  const contentType = res.headers.get('content-type') ?? 'application/pdf'
+  const data = await res.arrayBuffer()
+  return { data, contentType }
+}
+
 export interface CreateEnvelopeResult {
   envelopeId: string
   signingUrl: string
