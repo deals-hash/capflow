@@ -40,6 +40,9 @@ model Offer {
   factorRate      Float
   termDays        Int
   paymentFrequency String
+  position        String          @default("1st")
+  originationFee  Float           @default(1)
+  commissionPct   Float           @default(10)
   status          OfferStatus     @default(PENDING)
   expiresAt       DateTime?
   snapshots       OfferSnapshot[]

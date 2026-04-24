@@ -7,7 +7,7 @@ function ErrorPage({ message }: { message: string }) {
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', fontFamily: 'system-ui, -apple-system, sans-serif', padding: 24 }}>
       <div style={{ maxWidth: 400, textAlign: 'center' }}>
         <div style={{ fontSize: 36, marginBottom: 16 }}>⚠️</div>
-        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: '#0f172a', margin: '0 0 8px' }}>Unable to load offer</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 600, color: '#0f172a', margin: '0 0 8px' }}>Unable to load offer</h2>
         <p style={{ color: '#64748b', fontSize: 14, margin: 0 }}>{message}</p>
       </div>
     </div>
@@ -59,6 +59,9 @@ export default async function BrokerPage({
       factorRate: o.factorRate,
       termDays: o.termDays,
       paymentFrequency: o.paymentFrequency,
+      position: o.position,
+      originationFee: o.originationFee,
+      commissionPct: o.commissionPct,
       expiresAt: o.expiresAt ? o.expiresAt.toISOString() : null,
       status: o.status as string,
     })),
