@@ -573,6 +573,35 @@ const Toast = ({ msg, onClose }) => {
 // ─── DEAL DETAIL MODAL ───────────────────────────────────────────────────────
 const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOpenMerchant, onOpenUW }) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [bankReport, setBankReport] = useState(null);
+  const [bankReportLoading, setBankReportLoading] = useState(false);
+  const [bankReportOpen, setBankReportOpen] = useState(false);
+  const [idvDetail, setIdvDetail] = useState(null);
+  const [idvDetailLoading, setIdvDetailLoading] = useState(false);
+  const [idvDetailOpen, setIdvDetailOpen] = useState(false);
+
+  const fmtCurrency = (n) => n != null ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n) : '—';
+  const fmtDateShort = (iso) => iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+
+  const handleViewBankReport = () => {
+    if (bankReport) { setBankReportOpen(o => !o); return; }
+    setBankReportLoading(true);
+    fetch(`/api/plaid/report?dealId=${deal.id}`)
+      .then(r => r.json())
+      .then(d => { setBankReport(d); setBankReportOpen(true); setBankReportLoading(false); })
+      .catch(() => setBankReportLoading(false));
+  };
+
+  const handleViewIdCheck = () => {
+    if (idvDetail) { setIdvDetailOpen(o => !o); return; }
+    setIdvDetailLoading(true);
+    fetch(`/api/persona/inquiry?dealId=${deal.id}`)
+      .then(r => r.json())
+      .then(d => { setIdvDetail(d); setIdvDetailOpen(true); setIdvDetailLoading(false); })
+      .catch(() => setIdvDetailLoading(false));
+  };
+
+  const hasArtifacts = deal.bankStatus === "connected" || deal.idvStatus === "pass" || deal.agreementSigned;
   const si = stepIdx(deal.status);
   const steps = ["Offer Created", "Sent to Broker", "Offer Selected", "Merchant Invited", "Bank Connected", "ID Verified", "Signed", "Ready UW", "Approved", "Funded"];
 
@@ -646,6 +675,74 @@ const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOp
               </div>
             ))}
           </div>
+
+          {hasArtifacts && (
+            <>
+              <div className="divider" />
+              <div className="section-title mb-12">Documents</div>
+              <div className="flex" style={{ gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                {deal.bankStatus === "connected" && (
+                  <button className="btn btn-secondary btn-sm" onClick={handleViewBankReport} disabled={bankReportLoading}>
+                    <Icon name="bank" size={13} /> {bankReportLoading ? 'Loading…' : bankReportOpen ? 'Hide Bank Report' : 'View Bank Report'}
+                  </button>
+                )}
+                {deal.idvStatus === "pass" && (
+                  <button className="btn btn-secondary btn-sm" onClick={handleViewIdCheck} disabled={idvDetailLoading}>
+                    <Icon name="id" size={13} /> {idvDetailLoading ? 'Loading…' : idvDetailOpen ? 'Hide ID Check' : 'View ID Check'}
+                  </button>
+                )}
+                {deal.agreementSigned && (
+                  <button className="btn btn-secondary btn-sm" onClick={() => window.open(`/api/docusign/document?dealId=${deal.id}`, '_blank')}>
+                    <Icon name="sign" size={13} /> View Signed Document ↗
+                  </button>
+                )}
+              </div>
+              {bankReportOpen && bankReport && (
+                <div className="uw-artifact" style={{ marginBottom: 10 }}>
+                  <div className="uw-artifact-label">Bank Report — {bankReport.institution}</div>
+                  {bankReport.accounts?.map((acct, i) => (
+                    <div key={i} style={{ marginBottom: 8, padding: '8px 10px', background: 'var(--bg2)', borderRadius: 6 }}>
+                      <div className="fw-600 text-sm">{acct.name} <span className="text-dim">({acct.subtype})</span></div>
+                      <div className="text-sm mt-4">Balance: <strong>{fmtCurrency(acct.balances?.current)}</strong> · Available: {fmtCurrency(acct.balances?.available)}</div>
+                    </div>
+                  ))}
+                  {bankReport.transactions?.length > 0 && (
+                    <div style={{ marginTop: 8 }}>
+                      <div className="text-xs text-dim fw-600" style={{ marginBottom: 6 }}>LAST 90 DAYS ({bankReport.transactions.length} transactions)</div>
+                      <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+                        {bankReport.transactions.slice(0, 50).map((tx, i) => (
+                          <div key={i} className="flex items-center" style={{ justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
+                            <div><span className="text-dim">{tx.date}</span><span style={{ marginLeft: 8 }}>{tx.name}</span></div>
+                            <span style={{ color: tx.amount > 0 ? 'var(--red)' : 'var(--green)', fontWeight: 600 }}>{fmtCurrency(Math.abs(tx.amount))}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {idvDetailOpen && idvDetail && (
+                <div className="uw-artifact" style={{ marginBottom: 10 }}>
+                  <div className="uw-artifact-label">Identity Verification</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                    {[
+                      ['Status', idvDetail.status],
+                      ['Name', [idvDetail.nameFirst, idvDetail.nameLast].filter(Boolean).join(' ') || '—'],
+                      ['Birthdate', idvDetail.birthdate || '—'],
+                      ['Document', idvDetail.documentType || '—'],
+                      ['Country', idvDetail.country || '—'],
+                      ['Completed', fmtDateShort(idvDetail.completedAt)],
+                    ].map(([label, val]) => (
+                      <div key={label} style={{ padding: '6px 8px', background: 'var(--bg2)', borderRadius: 5 }}>
+                        <div className="text-xs text-dim">{label}</div>
+                        <div className="text-sm fw-600" style={{ marginTop: 2 }}>{val}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
 
           <div className="divider" />
 
