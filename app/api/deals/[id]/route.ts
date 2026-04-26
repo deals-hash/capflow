@@ -58,13 +58,13 @@ export async function PATCH(
   })
 
   if (body?.status === 'Offer Sent to Broker' && deal.brokerContact) {
-    const amount = deal.offers[0]?.amount ?? deal.requestedAmount
     sendBrokerOfferEmail({
       dealId: deal.id,
       brokerName: deal.brokerContact.name,
       brokerEmail: deal.brokerContact.email,
       merchantName: deal.merchantContact?.businessName ?? 'Merchant',
-      amount,
+      offers: deal.offers,
+      brokerShopId: deal.brokerShopId ?? null,
     }).catch(console.error)
   }
 

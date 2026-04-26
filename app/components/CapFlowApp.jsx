@@ -843,9 +843,16 @@ const NewDealModal = ({ onClose, onCreate }) => {
   const [step, setStep] = useState(0);
   const [deal, setDeal] = useState({
     merchant: { name: "", email: "", phone: "" },
-    broker: { name: "", email: "" },
+    broker: { name: "", email: "", shopId: null },
   });
   const [offers, setOffers] = useState([{ amount: "", payback: "", factor: "", term: "", frequency: "Daily", position: "1st", fee: "", expiry: "", commissionPct: "" }]);
+  const [brokerShops, setBrokerShops] = useState([]);
+  const [shopSearch, setShopSearch] = useState("");
+  const [selectedShop, setSelectedShop] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/broker-shops').then(r => r.json()).then(d => setBrokerShops(d.shops ?? [])).catch(() => {});
+  }, []);
 
   const setM = (k, v) => setDeal(d => ({ ...d, merchant: { ...d.merchant, [k]: v } }));
   const setB = (k, v) => setDeal(d => ({ ...d, broker: { ...d.broker, [k]: v } }));
@@ -856,6 +863,7 @@ const NewDealModal = ({ onClose, onCreate }) => {
       id: `D-${1004 + Math.floor(Math.random() * 900)}`,
       merchant: deal.merchant,
       broker: deal.broker,
+      brokerShopId: deal.broker.shopId ?? null,
       status: "Offer Created",
       created: new Date().toISOString().split("T")[0],
       offers: offers.map((o, i) => ({ ...o, id: `O-new-${i}`, amount: +o.amount, payback: +o.payback, factor: +o.factor, term: +o.term, fee: +o.fee })),
@@ -895,8 +903,45 @@ const NewDealModal = ({ onClose, onCreate }) => {
 
           {step === 1 && (
             <div className="fade-in">
-              <div className="form-group"><label className="form-label">Broker / ISO Name</label><input className="form-input" value={deal.broker.name} onChange={e => setB("name", e.target.value)} placeholder="Capital Partners LLC" /></div>
-              <div className="form-group"><label className="form-label">Broker Email</label><input className="form-input" value={deal.broker.email} onChange={e => setB("email", e.target.value)} placeholder="rep@capitalpartners.com" /></div>
+              <div className="form-group">
+                <label className="form-label">Search Broker Shop</label>
+                <input className="form-input" value={shopSearch} onChange={e => { setShopSearch(e.target.value); setSelectedShop(null); setB("shopId", null); setB("name", ""); setB("email", ""); }} placeholder="Type to search shops…" />
+              </div>
+              {shopSearch.length > 0 && !selectedShop && (() => {
+                const filtered = brokerShops.filter(s => s.name.toLowerCase().includes(shopSearch.toLowerCase()));
+                return filtered.length > 0 ? (
+                  <div style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden", marginBottom: 12 }}>
+                    {filtered.map(s => (
+                      <button key={s.id} className="nav-item" style={{ width: "100%", textAlign: "left", borderRadius: 0, borderBottom: "1px solid var(--border)" }}
+                        onClick={() => { setSelectedShop(s); setShopSearch(s.name); setB("shopId", s.id); }}>
+                        <span className="fw-600">{s.name}</span>
+                        {s.email && <span className="text-dim text-xs" style={{ marginLeft: 8 }}>{s.email}</span>}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-dim text-xs" style={{ marginBottom: 12 }}>No shops found — enter contact details manually below.</div>
+                );
+              })()}
+              {selectedShop && selectedShop.contacts?.length > 0 && (
+                <div className="form-group">
+                  <label className="form-label">Select Contact</label>
+                  <div style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+                    {selectedShop.contacts.map(c => (
+                      <button key={c.id} className={`nav-item ${deal.broker.email === c.email ? "active" : ""}`} style={{ width: "100%", textAlign: "left", borderRadius: 0, borderBottom: "1px solid var(--border)" }}
+                        onClick={() => { setB("name", c.name); setB("email", c.email); }}>
+                        <span className="fw-600">{c.name}</span>
+                        {c.isPrimary && <span style={{ fontSize: 10, background: "var(--accent)", color: "#fff", borderRadius: 4, padding: "1px 6px", marginLeft: 6 }}>Primary</span>}
+                        <span className="text-dim text-xs" style={{ marginLeft: 8 }}>{c.email}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="form-grid">
+                <div className="form-group"><label className="form-label">Contact Name</label><input className="form-input" value={deal.broker.name} onChange={e => setB("name", e.target.value)} placeholder="Rep name" /></div>
+                <div className="form-group"><label className="form-label">Contact Email</label><input className="form-input" value={deal.broker.email} onChange={e => setB("email", e.target.value)} placeholder="rep@shop.com" /></div>
+              </div>
             </div>
           )}
 
@@ -983,7 +1028,7 @@ const NewDealModal = ({ onClose, onCreate }) => {
                     </div>
                     <div className="form-group"><label className="form-label">Position</label>
                       <select className="form-input" value={o.position} onChange={e => setO(i, "position", e.target.value)}>
-                        <option>1st</option><option>2nd</option><option>3rd</option>
+                        <option>1st</option><option>2nd</option><option>3rd</option><option>4th</option><option>5th</option><option>6th</option><option>7th</option><option>8th</option><option>9th</option><option>10th</option>
                       </select>
                     </div>
                     <div className="form-group">
@@ -1964,6 +2009,7 @@ export default function App() {
     { id: "deals", label: "All Deals", icon: "deals" },
     { id: "uwqueue", label: "UW Queue", icon: "uw", badge: uwCount > 0 ? uwCount : null },
     { id: "alerts", label: "Alerts", icon: "notifications" },
+    { id: "brokers", label: "Broker Shops", icon: "funded", href: "/broker-shops" },
   ];
 
   const pageTitle = { dashboard: "Dashboard", deals: "All Deals", uwqueue: "UW Queue", alerts: "Alerts" };
@@ -1984,11 +2030,16 @@ export default function App() {
             <div className="nav-section">
               <div className="nav-section-label">Workspace</div>
               {NAV.map(n => (
-                <button key={n.id} className={`nav-item ${view === n.id ? "active" : ""}`} onClick={() => setView(n.id)}>
-                  <Icon name={n.icon} size={16} />
-                  {n.label}
-                  {n.badge && <span className="badge">{n.badge}</span>}
-                </button>
+                n.href
+                  ? <a key={n.id} href={n.href} className="nav-item" style={{ textDecoration: "none" }}>
+                      <Icon name={n.icon} size={16} />
+                      {n.label}
+                    </a>
+                  : <button key={n.id} className={`nav-item ${view === n.id ? "active" : ""}`} onClick={() => setView(n.id)}>
+                      <Icon name={n.icon} size={16} />
+                      {n.label}
+                      {n.badge && <span className="badge">{n.badge}</span>}
+                    </button>
               ))}
             </div>
           </nav>

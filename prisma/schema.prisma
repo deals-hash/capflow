@@ -19,8 +19,10 @@ model Deal {
   termDays          Int?
   brokerContactId   String?
   merchantContactId String?
+  brokerShopId      String?
   brokerContact     BrokerContact?          @relation(fields: [brokerContactId], references: [id])
   merchantContact   MerchantContact?        @relation(fields: [merchantContactId], references: [id])
+  brokerShop        BrokerShop?             @relation(fields: [brokerShopId], references: [id])
   offers            Offer[]
   bankConnections   BankConnectionRecord[]
   identityRecords   IdentityVerificationRecord[]
@@ -64,15 +66,32 @@ model OfferSnapshot {
   data      Json
 }
 
-model BrokerContact {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  clerkId   String?  @unique
+model BrokerShop {
+  id        String          @id @default(cuid())
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
   name      String
-  email     String   @unique
+  phone     String?
+  email     String?
+  address   String?
+  notes     String?
+  contacts  BrokerContact[]
+  deals     Deal[]
+}
+
+model BrokerContact {
+  id        String      @id @default(cuid())
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  clerkId   String?     @unique
+  name      String
+  email     String      @unique
   phone     String?
   company   String?
+  role      String?
+  isPrimary Boolean     @default(false)
+  shopId    String?
+  shop      BrokerShop? @relation(fields: [shopId], references: [id])
   deals     Deal[]
 }
 
