@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
         dealId,
         inquiryId,
         provider: 'persona',
-        status: status ?? 'COMPLETED',
+        status: status ? status.toUpperCase() : 'COMPLETED',
         completedAt: new Date(),
         rawData: fields ? JSON.parse(JSON.stringify(fields)) : undefined,
       },

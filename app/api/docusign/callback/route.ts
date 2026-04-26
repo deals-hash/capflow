@@ -35,21 +35,25 @@ export async function GET(request: NextRequest) {
   const merchantToken = params.get('merchantToken')
 
   if (event === 'signing_complete' && dealId && envelopeId) {
-    await Promise.all([
-      prisma.agreementRecord.create({
-        data: {
-          dealId,
-          provider: 'docusign',
-          signatureRequestId: envelopeId,
-          status: 'SIGNED',
-          signedAt: new Date(),
-        },
-      }),
-      prisma.deal.update({
-        where: { id: dealId },
-        data: { status: 'Agreement Signed' },
-      }),
-    ]).catch(console.error)
+    try {
+      await Promise.all([
+        prisma.agreementRecord.create({
+          data: {
+            dealId,
+            provider: 'docusign',
+            signatureRequestId: envelopeId,
+            status: 'SIGNED',
+            signedAt: new Date(),
+          },
+        }),
+        prisma.deal.update({
+          where: { id: dealId },
+          data: { status: 'Agreement Signed' },
+        }),
+      ])
+    } catch (err) {
+      console.error('[docusign callback] DB write failed:', err)
+    }
   }
 
   if (merchantToken) {

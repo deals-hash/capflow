@@ -65,8 +65,12 @@ export default async function MerchantPage({
     termDays: acceptedOffer.termDays,
     paymentFrequency: acceptedOffer.paymentFrequency,
     position: acceptedOffer.position,
-    bankConnected: deal.bankConnections.some(r => ['CONNECTED', 'ACTIVE'].includes(r.status)),
-    identityVerified: deal.identityRecords.some(r => ['COMPLETED', 'COMPLETE', 'PASSED'].includes(r.status)),
+    bankConnected: deal.bankConnections.some(r =>
+      !['PENDING', 'pending', 'FAILED', 'failed'].includes(r.status)
+    ),
+    identityVerified: deal.identityRecords.some(r =>
+      !['PENDING', 'pending'].includes(r.status)
+    ),
     agreementSigned: deal.agreements.some(r => r.status === 'SIGNED'),
   }
 
