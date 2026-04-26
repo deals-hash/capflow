@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server'
 import type { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createSigningEnvelope } from '@/lib/docusign'
+import { isMerchantTokenValid } from '@/lib/merchant-auth'
 
 function appUrl(): string {
   if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL
@@ -11,14 +12,12 @@ function appUrl(): string {
 
 export async function POST(request: NextRequest) {
   const { userId } = await auth()
-  if (!userId) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const { dealId, merchantToken } = await request.json()
 
-  const { dealId } = await request.json()
-  if (!dealId) {
-    return Response.json({ error: 'dealId is required' }, { status: 400 })
-  }
+  if (!dealId) return Response.json({ error: 'dealId is required' }, { status: 400 })
+
+  const authorized = !!userId || isMerchantTokenValid(merchantToken, dealId)
+  if (!authorized) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
   const deal = await prisma.deal.findUnique({
     where: { id: dealId },
@@ -29,7 +28,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'Deal or merchant not found' }, { status: 404 })
   }
 
-  const offer = deal.offers[0]
+  const offer = deal.offers.find(o => o.status === 'ACCEPTED') ?? deal.offers[0]
   if (!offer) {
     return Response.json({ error: 'No offer found for deal' }, { status: 400 })
   }
