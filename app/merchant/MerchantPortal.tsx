@@ -127,26 +127,13 @@ function PersonaStep({ dealId, token, onDone }: { dealId: string; token: string;
 }
 
 // ─── DOCUSIGN STEP ────────────────────────────────────────────────────────────
-function DocuSignStep({ dealId, token, onDone }: { dealId: string; token: string; onDone: () => void }) {
+function DocuSignStep({ dealId, token }: { dealId: string; token: string }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleClick = async () => {
     setLoading(true)
     setError(null)
-
-    const onMessage = (e: MessageEvent) => {
-      if (e.origin !== window.location.origin) return
-      if (!e.data || e.data.type !== 'docusign') return
-      window.removeEventListener('message', onMessage)
-      if (e.data.event === 'signing_complete') {
-        onDone()
-      } else {
-        setError('Signing was cancelled. Please try again.')
-        setLoading(false)
-      }
-    }
-
     try {
       const res = await fetch('/api/docusign/create-envelope', {
         method: 'POST',
@@ -155,27 +142,7 @@ function DocuSignStep({ dealId, token, onDone }: { dealId: string; token: string
       })
       if (!res.ok) throw new Error()
       const { signingUrl } = await res.json()
-
-      const w = 900, h = 650
-      const left = Math.max(0, (window.screen.width - w) / 2)
-      const top = Math.max(0, (window.screen.height - h) / 2)
-      const popup = window.open(signingUrl, 'docusign_signing', `width=${w},height=${h},left=${left},top=${top},toolbar=0,menubar=0`)
-
-      if (!popup) {
-        setError('Popup blocked. Please allow popups for this site and try again.')
-        setLoading(false)
-        return
-      }
-
-      window.addEventListener('message', onMessage)
-
-      const poll = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(poll)
-          window.removeEventListener('message', onMessage)
-          setLoading(false)
-        }
-      }, 500)
+      window.location.href = signingUrl
     } catch {
       setError('Failed to start signing. Please try again.')
       setLoading(false)
@@ -185,11 +152,11 @@ function DocuSignStep({ dealId, token, onDone }: { dealId: string; token: string
   return (
     <div>
       <p style={{ color: '#999999', fontSize: 14, lineHeight: 1.7, marginBottom: 28 }}>
-        Review and electronically sign your merchant cash advance agreement. A secure signing window will open. Your agreement is binding once signed.
+        Review and electronically sign your merchant cash advance agreement. You&apos;ll be redirected to DocuSign and returned here when complete.
       </p>
       {error && <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#ef4444', marginBottom: 16 }}>{error}</div>}
       <GoldButton onClick={handleClick} disabled={loading}>
-        {loading ? 'Opening…' : 'Review & Sign Agreement'}
+        {loading ? 'Redirecting…' : 'Review & Sign Agreement'}
       </GoldButton>
     </div>
   )
@@ -352,7 +319,7 @@ export default function MerchantPortal({ deal, token }: { deal: Deal; token: str
                       <div style={{ paddingLeft: 44 }}>
                         {step === 0 && <PlaidStep dealId={deal.id} token={token} onDone={() => setStep(1)} />}
                         {step === 1 && <PersonaStep dealId={deal.id} token={token} onDone={() => setStep(2)} />}
-                        {step === 2 && <DocuSignStep dealId={deal.id} token={token} onDone={() => setStep(3)} />}
+                        {step === 2 && <DocuSignStep dealId={deal.id} token={token} />}
                       </div>
                     )}
                   </div>

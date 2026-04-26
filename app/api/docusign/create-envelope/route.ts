@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
   }
 
   const base = appUrl()
+  const tokenParam = merchantToken ? `&merchantToken=${encodeURIComponent(merchantToken)}` : ''
 
   const { envelopeId, signingUrl } = await createSigningEnvelope({
     dealId,
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
     factorRate: offer.factorRate,
     termDays: offer.termDays,
     paymentFrequency: offer.paymentFrequency,
-    returnUrl: (envId) => `${base}/api/docusign/callback?dealId=${dealId}&envelopeId=${envId}`,
+    returnUrl: (envId) => `${base}/api/docusign/callback?dealId=${dealId}&envelopeId=${envId}${tokenParam}`,
   })
 
   return Response.json({ envelopeId, signingUrl })

@@ -1,6 +1,12 @@
 import type { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+function appUrl(): string {
+  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
+  return 'http://localhost:3000'
+}
+
 function closePopupHtml(event: string): string {
   return `<!DOCTYPE html>
 <html>
@@ -26,6 +32,7 @@ export async function GET(request: NextRequest) {
   const event = params.get('event') ?? 'unknown'
   const dealId = params.get('dealId')
   const envelopeId = params.get('envelopeId')
+  const merchantToken = params.get('merchantToken')
 
   if (event === 'signing_complete' && dealId && envelopeId) {
     await Promise.all([
@@ -43,6 +50,11 @@ export async function GET(request: NextRequest) {
         data: { status: 'Agreement Signed' },
       }),
     ]).catch(console.error)
+  }
+
+  if (merchantToken) {
+    const base = appUrl()
+    return Response.redirect(`${base}/merchant?token=${encodeURIComponent(merchantToken)}`)
   }
 
   return new Response(closePopupHtml(event), {
