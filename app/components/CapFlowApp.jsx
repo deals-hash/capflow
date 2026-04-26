@@ -913,7 +913,14 @@ const NewDealModal = ({ onClose, onCreate }) => {
                   <div style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden", marginBottom: 12 }}>
                     {filtered.map(s => (
                       <button key={s.id} className="nav-item" style={{ width: "100%", textAlign: "left", borderRadius: 0, borderBottom: "1px solid var(--border)" }}
-                        onClick={() => { setSelectedShop(s); setShopSearch(s.name); setB("shopId", s.id); }}>
+                        onClick={() => {
+                          setSelectedShop(s);
+                          setShopSearch(s.name);
+                          setB("shopId", s.id);
+                          const primary = s.contacts?.find(c => c.isPrimary) ?? s.contacts?.[0];
+                          setB("name", primary?.name ?? s.name);
+                          setB("email", primary?.email ?? s.email ?? "");
+                        }}>
                         <span className="fw-600">{s.name}</span>
                         {s.email && <span className="text-dim text-xs" style={{ marginLeft: 8 }}>{s.email}</span>}
                       </button>
