@@ -151,7 +151,7 @@ export default function BrokerShopsPage() {
                 <div key={f} style={{ marginBottom: 16 }}>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{f}</label>
                   <input
-                    value={(editShop as Record<string, string | null>)[f] ?? ''}
+                    value={editShop[f] ?? ''}
                     onChange={e => setEditShop(prev => prev ? { ...prev, [f]: e.target.value } : prev)}
                     style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: 8, padding: '8px 12px', color: '#e2e8f0', fontSize: 14 }}
                   />
