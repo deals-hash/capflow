@@ -51,6 +51,24 @@ export async function GET(request: NextRequest) {
           data: { status: 'Agreement Signed' },
         }),
       ])
+
+      const deal = await prisma.deal.findUnique({
+        where: { id: dealId },
+        select: {
+          bankConnections: { select: { status: true } },
+          identityRecords: { select: { status: true } },
+        },
+      })
+
+      const bankDone = deal?.bankConnections.some(r => !['PENDING', 'pending', 'FAILED', 'failed'].includes(r.status)) ?? false
+      const identityDone = deal?.identityRecords.some(r => !['PENDING', 'pending'].includes(r.status)) ?? false
+
+      if (bankDone && identityDone) {
+        await prisma.deal.update({
+          where: { id: dealId },
+          data: { status: 'Ready for Final UW' },
+        })
+      }
     } catch (err) {
       console.error('[docusign callback] DB write failed:', err)
     }
