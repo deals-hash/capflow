@@ -94,8 +94,8 @@ function mapDeal(d) {
       ? { name: d.merchantContact.businessName, email: d.merchantContact.email, phone: d.merchantContact.phone || '' }
       : { name: '', email: '', phone: '' },
     broker: d.brokerContact
-      ? { name: d.brokerContact.name, email: d.brokerContact.email }
-      : { name: '', email: '' },
+      ? { name: d.brokerContact.name, email: d.brokerContact.email, phone: d.brokerContact.phone || '', shopName: d.brokerShop?.name || d.brokerContact.company || '' }
+      : { name: '', email: '', phone: '', shopName: '' },
     offers: (d.offers || []).map(o => ({
       id: o.id,
       amount: o.amount,
@@ -639,6 +639,39 @@ const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOp
                   <div className="step-label">{s}</div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="divider" />
+
+          {/* Contact info */}
+          <div className="grid-2" style={{ gap: 10, marginBottom: 16 }}>
+            <div className="uw-artifact">
+              <div className="uw-artifact-label" style={{ marginBottom: 10 }}>Merchant</div>
+              {[
+                ["Business", deal.merchant.name],
+                ["Email", deal.merchant.email],
+                ["Phone", deal.merchant.phone],
+              ].map(([label, val]) => val ? (
+                <div key={label} className="flex items-center gap-8" style={{ marginBottom: 6 }}>
+                  <span className="text-xs text-dim" style={{ width: 48, flexShrink: 0 }}>{label}</span>
+                  <span className="text-sm fw-600" style={{ wordBreak: "break-all" }}>{val}</span>
+                </div>
+              ) : null)}
+            </div>
+            <div className="uw-artifact">
+              <div className="uw-artifact-label" style={{ marginBottom: 10 }}>Broker</div>
+              {[
+                ["Shop", deal.broker.shopName],
+                ["Contact", deal.broker.name],
+                ["Email", deal.broker.email],
+                ["Phone", deal.broker.phone],
+              ].map(([label, val]) => val ? (
+                <div key={label} className="flex items-center gap-8" style={{ marginBottom: 6 }}>
+                  <span className="text-xs text-dim" style={{ width: 48, flexShrink: 0 }}>{label}</span>
+                  <span className="text-sm fw-600" style={{ wordBreak: "break-all" }}>{val}</span>
+                </div>
+              ) : null)}
             </div>
           </div>
 
