@@ -66,10 +66,10 @@ export default async function MerchantPage({
     paymentFrequency: acceptedOffer.paymentFrequency,
     position: acceptedOffer.position,
     bankConnected: deal.bankConnections.some(r =>
-      !['PENDING', 'pending', 'FAILED', 'failed'].includes(r.status)
+      !['pending', 'failed'].includes(r.status.toLowerCase())
     ),
     identityVerified: deal.identityRecords.some(r =>
-      !['PENDING', 'pending'].includes(r.status)
+      r.status.toLowerCase() !== 'pending'
     ),
     agreementSigned: deal.agreements.some(r => r.status === 'SIGNED'),
   }

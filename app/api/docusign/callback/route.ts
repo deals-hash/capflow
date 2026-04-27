@@ -60,8 +60,8 @@ export async function GET(request: NextRequest) {
         },
       })
 
-      const bankDone = deal?.bankConnections.some(r => !['PENDING', 'pending', 'FAILED', 'failed'].includes(r.status)) ?? false
-      const identityDone = deal?.identityRecords.some(r => !['PENDING', 'pending'].includes(r.status)) ?? false
+      const bankDone = deal?.bankConnections.some(r => !['pending', 'failed'].includes(r.status.toLowerCase())) ?? false
+      const identityDone = deal?.identityRecords.some(r => r.status.toLowerCase() !== 'pending') ?? false
 
       if (bankDone && identityDone) {
         await prisma.deal.update({
