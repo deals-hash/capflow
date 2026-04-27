@@ -29,14 +29,13 @@ const usd = (n: number) =>
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
+function termLabel(freq: string): string {
+  return freq === 'Daily' ? 'days' : freq === 'Weekly' ? 'weeks' : 'months'
+}
+
 function achPayments(offer: Offer): { count: number; perPayment: number } {
   const payback = offer.amount * offer.factorRate
-  const freq = offer.paymentFrequency
-  const count =
-    freq === 'Weekly' ? Math.round(offer.termDays * 4.33) :
-    freq === 'Monthly' ? offer.termDays :
-    Math.round(offer.termDays * 21.5)
-  return { count, perPayment: payback / count }
+  return { count: offer.termDays, perPayment: payback / offer.termDays }
 }
 
 function OfferCard({
@@ -60,7 +59,7 @@ function OfferCard({
   const grid: [string, string][] = [
     ['Total Payback', usd(payback)],
     ['Factor Rate', `${offer.factorRate}x`],
-    ['Term', `${offer.termDays} months`],
+    ['Term', `${offer.termDays} ${termLabel(offer.paymentFrequency)}`],
     ['Position', offer.position],
     ['Origination Fee', `${offer.originationFee}% · ${usd(feeAmount)}`],
     ['Frequency', offer.paymentFrequency],
@@ -157,7 +156,7 @@ function ConfirmationScreen({ offer, merchantName }: { offer: Offer; merchantNam
     ['Advance Amount', usd(offer.amount)],
     ['Total Payback', usd(payback)],
     ['Factor Rate', `${offer.factorRate}x`],
-    ['Term', `${offer.termDays} months`],
+    ['Term', `${offer.termDays} ${termLabel(offer.paymentFrequency)}`],
     ['Position', offer.position],
     ['Origination Fee', `${offer.originationFee}% · ${usd(feeAmount)}`],
     ['Payment Frequency', offer.paymentFrequency],

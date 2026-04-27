@@ -995,7 +995,7 @@ const NewDealModal = ({ onClose, onCreate }) => {
                           setOffers(os => os.map((x, j) => j === i ? { ...x, ...updates } : x));
                         }} />
                     </div>
-                    <div className="form-group"><label className="form-label">Term (months)</label><input className="form-input" type="number" value={o.term} onChange={e => setO(i, "term", e.target.value)} placeholder="8" /></div>
+                    <div className="form-group"><label className="form-label">Term ({o.frequency === "Daily" ? "business days" : o.frequency === "Weekly" ? "weeks" : "months"})</label><input className="form-input" type="number" value={o.term} onChange={e => setO(i, "term", e.target.value)} placeholder={o.frequency === "Daily" ? "120" : o.frequency === "Weekly" ? "20" : "8"} /></div>
                     <div className="form-group"><label className="form-label">ACH Frequency</label>
                       <select className="form-input" value={o.frequency} onChange={e => setO(i, "frequency", e.target.value)}>
                         <option>Daily</option><option>Weekly</option><option>Monthly</option>
@@ -1014,9 +1014,7 @@ const NewDealModal = ({ onClose, onCreate }) => {
                             Enter payback amount and term first
                           </div>
                         );
-                        const periods = o.frequency === "Daily" ? term * 21.5
-                          : o.frequency === "Weekly" ? term * 4.33
-                          : term;
+                        const periods = term;
                         const ach = pb / periods;
                         return (
                           <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
@@ -1027,7 +1025,7 @@ const NewDealModal = ({ onClose, onCreate }) => {
                             </div>
                             <div style={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px", fontSize: 11, color: "var(--text2)", lineHeight: 1.5, display: "flex", flexDirection: "column", justifyContent: "center" }}>
                               <div style={{ fontWeight: 600, color: "var(--text)", marginBottom: 2 }}>{Math.round(periods)} payments</div>
-                              <div>{o.frequency === "Daily" ? "~21.5 days/mo" : o.frequency === "Weekly" ? "~4.33 wks/mo" : "1/mo"}</div>
+                              <div>{o.frequency === "Daily" ? "business days" : o.frequency === "Weekly" ? "weeks" : "months"}</div>
                             </div>
                           </div>
                         );

@@ -48,13 +48,13 @@ type OfferRow = {
   expiresAt: Date | null
 }
 
+function termLabel(freq: string): string {
+  return freq === 'Daily' ? 'days' : freq === 'Weekly' ? 'weeks' : 'months'
+}
+
 function achPayments(offer: OfferRow): { count: number; perPayment: number } {
   const payback = offer.amount * offer.factorRate
-  const count =
-    offer.paymentFrequency === 'Weekly' ? Math.round(offer.termDays * 4.33) :
-    offer.paymentFrequency === 'Monthly' ? offer.termDays :
-    Math.round(offer.termDays * 21.5)
-  return { count, perPayment: payback / count }
+  return { count: offer.termDays, perPayment: payback / offer.termDays }
 }
 
 function offerCardHtml(offer: OfferRow, index: number, selectUrl: string): string {
@@ -67,7 +67,7 @@ function offerCardHtml(offer: OfferRow, index: number, selectUrl: string): strin
   const cells = [
     ['Total Payback', usd(payback)],
     ['Factor Rate', `${offer.factorRate}x`],
-    ['Term', `${offer.termDays} months`],
+    ['Term', `${offer.termDays} ${termLabel(offer.paymentFrequency)}`],
     ['Position', offer.position],
     ['Orig. Fee', `${offer.originationFee}% · ${usd(feeAmt)}`],
     ['Frequency', offer.paymentFrequency],

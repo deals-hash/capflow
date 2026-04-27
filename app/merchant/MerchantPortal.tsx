@@ -199,12 +199,10 @@ export default function MerchantPortal({ deal, token }: { deal: Deal; token: str
   const [step, setStep] = useState(initStep)
 
   const payback = deal.amount * deal.factorRate
-  const achCount =
-    deal.paymentFrequency === 'Weekly' ? Math.round(deal.termDays * 4.33) :
-    deal.paymentFrequency === 'Monthly' ? deal.termDays :
-    Math.round(deal.termDays * 21.5)
+  const achCount = deal.termDays
   const achAmt = payback / achCount
   const freqLabel = deal.paymentFrequency === 'Daily' ? 'day' : deal.paymentFrequency === 'Weekly' ? 'week' : 'month'
+  const termUnit = deal.paymentFrequency === 'Daily' ? 'days' : deal.paymentFrequency === 'Weekly' ? 'weeks' : 'months'
 
   const stepIcons = ['🏦', '🪪', '✍️']
   const stepTitles = ['Connect Your Bank', 'Verify Your Identity', 'Sign Your Agreement']
@@ -246,7 +244,7 @@ export default function MerchantPortal({ deal, token }: { deal: Deal; token: str
                 ['Advance Amount', usd(deal.amount)],
                 ['Total Payback', usd(payback)],
                 ['Factor Rate', `${deal.factorRate}x`],
-                ['Term', `${deal.termDays} months`],
+                ['Term', `${deal.termDays} ${termUnit}`],
                 ['Position', deal.position],
                 ['ACH Remittance', `${usd(achAmt)}/${freqLabel}`],
               ].map(([label, value]) => (
