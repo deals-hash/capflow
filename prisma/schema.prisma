@@ -29,6 +29,7 @@ model Deal {
   agreements        AgreementRecord[]
   notifications     NotificationLog[]
   underwritingDecisions UnderwritingDecision[]
+  emailSubmissions  EmailSubmission[]
 }
 
 
@@ -172,4 +173,18 @@ model UnderwritingDecision {
   reasons     Json?
   decidedBy   String?
   notes       String?
+}
+
+model EmailSubmission {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  dealId      String?
+  deal        Deal?    @relation(fields: [dealId], references: [id])
+  messageId   String?
+  fromEmail   String
+  fromName    String?
+  toEmails    String[]
+  ccEmails    String[]
+  subject     String?
+  attachments Json
 }

@@ -14,6 +14,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/persona/create-inquiry",
   "/api/persona/complete-inquiry",
   "/api/docusign/create-envelope",
+  "/api/inbound/email",
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
