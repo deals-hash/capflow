@@ -1971,6 +1971,216 @@ const NotificationsPanel = ({ deals }) => {
   );
 };
 
+// ─── SUBMISSION MODAL ────────────────────────────────────────────────────────
+const SubmissionModal = ({ onClose, onCreate }) => {
+  const [phase, setPhase] = useState('upload'); // 'upload' | 'processing' | 'review'
+  const [files, setFiles] = useState([]);
+  const [dragging, setDragging] = useState(false);
+  const [error, setError] = useState(null);
+  const [extracted, setExtracted] = useState({
+    businessName: '', ownerName: '', email: '', phone: '',
+    address: '', requestedAmount: '', industry: '', notes: '',
+  });
+  const fileInputRef = { current: null };
+
+  const handleFiles = (incoming) => {
+    const pdfs = Array.from(incoming).filter(f => f.type === 'application/pdf' || f.name.endsWith('.pdf'));
+    if (!pdfs.length) { setError('Please upload PDF files only.'); return; }
+    setError(null);
+    setFiles(pdfs);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault(); setDragging(false);
+    handleFiles(e.dataTransfer.files);
+  };
+
+  const handleProcess = async () => {
+    if (!files.length) { setError('Select at least one PDF.'); return; }
+    setPhase('processing');
+    setError(null);
+    const fd = new FormData();
+    files.forEach(f => fd.append('files', f));
+    try {
+      const res = await fetch('/api/submissions/process', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? 'Processing failed.'); setPhase('upload'); return; }
+      setExtracted({
+        businessName: data.extracted.businessName ?? '',
+        ownerName: data.extracted.ownerName ?? '',
+        email: data.extracted.email ?? '',
+        phone: data.extracted.phone ?? '',
+        address: data.extracted.address ?? '',
+        requestedAmount: data.extracted.requestedAmount ? String(data.extracted.requestedAmount) : '',
+        industry: data.extracted.industry ?? '',
+        notes: data.extracted.notes ?? '',
+      });
+      setPhase('review');
+    } catch {
+      setError('Network error. Please try again.');
+      setPhase('upload');
+    }
+  };
+
+  const handleCreate = () => {
+    const dealData = {
+      merchantName: extracted.businessName,
+      merchantEmail: extracted.email,
+      merchantPhone: extracted.phone,
+      brokerName: '',
+      brokerEmail: '',
+      requestedAmount: parseFloat(extracted.requestedAmount) || 0,
+      notes: [extracted.industry, extracted.address, extracted.notes].filter(Boolean).join(' | '),
+    };
+    onCreate(dealData);
+    onClose();
+  };
+
+  const set = (k, v) => setExtracted(x => ({ ...x, [k]: v }));
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">New Submission</div>
+            <div className="modal-sub">
+              {phase === 'upload' && 'Upload PDF documents to extract merchant info automatically'}
+              {phase === 'processing' && 'Analyzing documents with AI…'}
+              {phase === 'review' && 'Review and edit extracted information before creating the deal'}
+            </div>
+          </div>
+          <button className="btn btn-secondary btn-sm" onClick={onClose}><Icon name="x" size={14} /></button>
+        </div>
+        <div className="modal-body">
+          <div className="stepper">
+            {['Upload', 'Process', 'Review'].map((s, i) => {
+              const idx = phase === 'upload' ? 0 : phase === 'processing' ? 1 : 2;
+              return (
+                <div key={s} className={`step-item ${i < idx ? 'done' : i === idx ? 'active' : ''}`}>
+                  <div className="step-dot">{i < idx ? <Icon name="check" size={12} color="#fff" /> : i + 1}</div>
+                  <div className="step-label">{s}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          {phase === 'upload' && (
+            <div className="fade-in">
+              <div
+                onDragOver={e => { e.preventDefault(); setDragging(true); }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={handleDrop}
+                onClick={() => document.getElementById('sub-file-input').click()}
+                style={{
+                  border: `2px dashed ${dragging ? 'var(--accent)' : 'var(--border2)'}`,
+                  borderRadius: 12, padding: '40px 24px', textAlign: 'center',
+                  cursor: 'pointer', background: dragging ? 'rgba(22,163,74,.05)' : 'var(--bg)',
+                  transition: 'all .15s', marginBottom: 16,
+                }}
+              >
+                <div style={{ fontSize: 32, marginBottom: 10 }}>📄</div>
+                <div className="fw-600" style={{ marginBottom: 4 }}>Drop PDFs here or click to browse</div>
+                <div className="text-dim text-sm">Bank statements, applications, tax documents — up to 5 files</div>
+                <input
+                  id="sub-file-input"
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  multiple
+                  style={{ display: 'none' }}
+                  onChange={e => handleFiles(e.target.files)}
+                />
+              </div>
+              {files.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  {files.map((f, i) => (
+                    <div key={i} className="flex items-center gap-8" style={{ padding: '8px 12px', background: 'var(--surface2)', borderRadius: 8, marginBottom: 6 }}>
+                      <Icon name="sign" size={14} color="var(--accent)" />
+                      <span className="text-sm fw-600" style={{ flex: 1 }}>{f.name}</span>
+                      <span className="text-xs text-dim">{(f.size / 1024).toFixed(0)} KB</span>
+                      <button className="btn btn-secondary btn-sm" style={{ padding: '2px 6px' }}
+                        onClick={e => { e.stopPropagation(); setFiles(fs => fs.filter((_, j) => j !== i)); }}>
+                        <Icon name="x" size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {error && <div style={{ color: 'var(--red)', fontSize: 13, marginBottom: 12 }}>{error}</div>}
+            </div>
+          )}
+
+          {phase === 'processing' && (
+            <div className="fade-in" style={{ textAlign: 'center', padding: '48px 0' }}>
+              <div style={{ width: 56, height: 56, border: '4px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin .8s linear infinite', margin: '0 auto 20px' }} />
+              <div className="fw-600" style={{ fontSize: 16, marginBottom: 6 }}>Analyzing {files.length} document{files.length > 1 ? 's' : ''}…</div>
+              <div className="text-dim text-sm">Claude is extracting merchant information</div>
+            </div>
+          )}
+
+          {phase === 'review' && (
+            <div className="fade-in">
+              <div style={{ background: 'rgba(22,163,74,.06)', border: '1px solid rgba(22,163,74,.2)', borderRadius: 8, padding: '8px 14px', marginBottom: 16, fontSize: 12, color: 'var(--green)', fontWeight: 600 }}>
+                ✓ Extraction complete — review and edit before creating the deal
+              </div>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label className="form-label">Business Name</label>
+                  <input className="form-input" value={extracted.businessName} onChange={e => set('businessName', e.target.value)} placeholder="Acme LLC" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Owner Name</label>
+                  <input className="form-input" value={extracted.ownerName} onChange={e => set('ownerName', e.target.value)} placeholder="John Smith" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email</label>
+                  <input className="form-input" value={extracted.email} onChange={e => set('email', e.target.value)} placeholder="owner@acme.com" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Phone</label>
+                  <input className="form-input" value={extracted.phone} onChange={e => set('phone', e.target.value)} placeholder="555-000-0000" />
+                </div>
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <label className="form-label">Address</label>
+                  <input className="form-input" value={extracted.address} onChange={e => set('address', e.target.value)} placeholder="123 Main St, City, ST 00000" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Requested Amount</label>
+                  <CurrencyInput value={extracted.requestedAmount} onChange={v => set('requestedAmount', v)} placeholder="50000" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Industry</label>
+                  <input className="form-input" value={extracted.industry} onChange={e => set('industry', e.target.value)} placeholder="Restaurant, Retail…" />
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Notes</label>
+                <textarea className="form-input" rows={3} value={extracted.notes} onChange={e => set('notes', e.target.value)} placeholder="Monthly revenue, years in business, MCA history…" style={{ resize: 'vertical' }} />
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+          {phase === 'upload' && (
+            <button className="btn btn-primary" onClick={handleProcess} disabled={!files.length}>
+              <Icon name="send" size={14} /> Process with AI
+            </button>
+          )}
+          {phase === 'review' && (
+            <>
+              <button className="btn btn-secondary" onClick={() => setPhase('upload')}>← Re-upload</button>
+              <button className="btn btn-green" onClick={handleCreate} disabled={!extracted.businessName}>
+                <Icon name="check" size={14} /> Create Deal
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [deals, setDeals] = useState([]);
@@ -1978,6 +2188,7 @@ export default function App() {
   const [view, setView] = useState("dashboard");
   const [selectedDeal, setSelectedDeal] = useState(null);
   const [showNewDeal, setShowNewDeal] = useState(false);
+  const [showSubmission, setShowSubmission] = useState(false);
   const [brokerDeal, setBrokerDeal] = useState(null);
   const [merchantDeal, setMerchantDeal] = useState(null);
   const [uwDeal, setUwDeal] = useState(null);
@@ -2009,6 +2220,20 @@ export default function App() {
       .then(r => r.json())
       .then(saved => { setDeals(ds => [mapDeal(saved), ...ds]); notify(`Deal created!`); })
       .catch(() => notify('Failed to create deal'));
+  };
+
+  const handleSubmissionCreate = (extracted) => {
+    const dealData = {
+      merchant: { name: extracted.merchantName || '', email: extracted.merchantEmail || '', phone: extracted.merchantPhone || '' },
+      broker: { name: extracted.brokerName || '', email: extracted.brokerEmail || '' },
+      requestedAmount: extracted.requestedAmount || 0,
+      notes: extracted.notes || '',
+      offers: [],
+    };
+    fetch('/api/deals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dealData) })
+      .then(r => r.json())
+      .then(saved => { setDeals(ds => [mapDeal(saved), ...ds]); notify(`Deal created from submission!`); setView('deals'); })
+      .catch(() => notify('Failed to create deal from submission'));
   };
 
   const handleBrokerSelect = (id, offerId) => {
@@ -2097,6 +2322,9 @@ export default function App() {
           <div className="topbar">
             <div className="topbar-title">{pageTitle[view]}</div>
             <div className="topbar-actions">
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowSubmission(true)}>
+                <Icon name="plus" size={14} /> New Submission
+              </button>
               {view === "deals" && (
                 <button className="btn btn-primary btn-sm" onClick={() => setShowNewDeal(true)}>
                   <Icon name="plus" size={14} /> New Deal
@@ -2137,6 +2365,12 @@ export default function App() {
         <NewDealModal
           onClose={() => setShowNewDeal(false)}
           onCreate={handleCreate}
+        />
+      )}
+      {showSubmission && (
+        <SubmissionModal
+          onClose={() => setShowSubmission(false)}
+          onCreate={handleSubmissionCreate}
         />
       )}
       {brokerDeal && (
