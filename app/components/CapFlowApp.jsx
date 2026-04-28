@@ -56,6 +56,7 @@ const MOCK_DEALS = [
 ];
 
 const STATUSES = [
+  "Submission Received",
   "Offer Created",
   "Offer Sent to Broker",
   "Offer Selected",
@@ -70,6 +71,7 @@ const STATUSES = [
 ];
 
 const STATUS_COLORS = {
+  "Submission Received": "#0ea5e9",
   "Offer Created": "#64748b",
   "Offer Sent to Broker": "#3b82f6",
   "Offer Selected": "#8b5cf6",
@@ -616,7 +618,7 @@ const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOp
   const hasIdvRecord = fullDeal?.identityRecords?.length > 0;
   const hasAgreement = fullDeal?.agreements?.length > 0;
   const si = stepIdx(deal.status);
-  const steps = ["Offer Created", "Sent to Broker", "Offer Selected", "Merchant Invited", "Bank Connected", "ID Verified", "Signed", "Ready UW", "Approved", "Funded"];
+  const steps = ["Received", "Offer Created", "Sent to Broker", "Offer Selected", "Merchant Invited", "Bank Connected", "ID Verified", "Signed", "Ready UW", "Approved", "Funded"];
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -806,6 +808,11 @@ const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOp
           {/* Actions */}
           <div className="section-title mb-12">Actions</div>
           <div className="flex" style={{ gap: 8, flexWrap: "wrap" }}>
+            {deal.status === "Submission Received" && (
+              <button className="btn btn-primary" onClick={() => { onUpdate(deal.id, "Offer Created"); onClose(); onNewDeal && onNewDeal(); }}>
+                <Icon name="plus" size={15} /> Create Offer
+              </button>
+            )}
             {deal.status === "Offer Created" && (
               <button className="btn btn-primary" onClick={() => { onUpdate(deal.id, "Offer Sent to Broker"); onClose(); }}>
                 <Icon name="send" size={15} /> Send Offer to Broker
@@ -1727,6 +1734,7 @@ const UWModal = ({ deal, onClose, onDecide }) => {
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 const Dashboard = ({ deals, onSelectDeal }) => {
   const total = deals.length;
+  const newSubmissions = deals.filter(d => d.status === "Submission Received").length;
   const funded = deals.filter(d => d.status === "Funded").length;
   const uwReady = deals.filter(d => d.status === "Ready for Final UW").length;
   const totalVolume = deals.filter(d => d.selectedOffer).reduce((acc, d) => {
@@ -1738,11 +1746,16 @@ const Dashboard = ({ deals, onSelectDeal }) => {
 
   return (
     <div className="fade-in">
-      <div className="stat-grid">
+      <div className="stat-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
         <div className="stat-card">
           <div className="stat-label">Total Deals</div>
           <div className="stat-value">{total}</div>
           <div className="stat-sub">All time</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">New Submissions</div>
+          <div className="stat-value" style={{ color: "#0ea5e9" }}>{newSubmissions}</div>
+          <div className="stat-sub">Awaiting offer</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">UW Queue</div>
@@ -2228,6 +2241,7 @@ export default function App() {
       broker: { name: extracted.brokerName || '', email: extracted.brokerEmail || '' },
       requestedAmount: extracted.requestedAmount || 0,
       notes: extracted.notes || '',
+      status: 'Submission Received',
       offers: [],
     };
     fetch('/api/deals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dealData) })
