@@ -87,6 +87,22 @@ const STATUS_COLORS = {
   "Funded": "#16a34a",
 };
 
+const PREV_STATUS = {
+  "Declined":                "Submission Received",
+  "Offer Created":           "Submission Received",
+  "Offer Sent to Broker":    "Offer Created",
+  "Offer Selected":          "Offer Sent to Broker",
+  "Merchant Invited":        "Offer Selected",
+  "Bank Connected":          "Merchant Invited",
+  "Identity Verified":       "Bank Connected",
+  "Agreement Signed":        "Identity Verified",
+  "Ready for Final UW":      "Agreement Signed",
+  "UW Approved":             "Ready for Final UW",
+  "UW Declined":             "Ready for Final UW",
+  "Funding Call Completed":  "UW Approved",
+  "Funded":                  "Funding Call Completed",
+};
+
 // ─── API HELPERS ──────────────────────────────────────────────────────────────
 function mapDeal(d) {
   return {
@@ -580,8 +596,9 @@ const Toast = ({ msg, onClose }) => {
 };
 
 // ─── DEAL DETAIL MODAL ───────────────────────────────────────────────────────
-const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOpenMerchant, onOpenUW, onDecline, onCreateOffer }) => {
+const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOpenMerchant, onOpenUW, onDecline, onCreateOffer, onAssignBroker }) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmRevert, setConfirmRevert] = useState(false);
   const [fullDeal, setFullDeal] = useState(null);
   const [docsLoading, setDocsLoading] = useState(false);
   const [bankReport, setBankReport] = useState(null);
@@ -873,6 +890,36 @@ const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOp
               </button>
             )}
           </div>
+
+          {/* Assign broker when none attached */}
+          {!deal.broker.email && (
+            <>
+              <div className="divider" />
+              <button className="btn btn-secondary btn-sm" onClick={() => { onClose(); onAssignBroker && onAssignBroker(deal); }}>
+                <Icon name="funded" size={14} /> Assign Broker Shop
+              </button>
+            </>
+          )}
+
+          <div className="divider" />
+
+          {/* Revert status */}
+          {PREV_STATUS[deal.status] && !confirmRevert && (
+            <button className="btn btn-secondary btn-sm" style={{ color: "var(--amber)" }} onClick={() => setConfirmRevert(true)}>
+              ↩ Revert to "{PREV_STATUS[deal.status]}"
+            </button>
+          )}
+          {confirmRevert && (
+            <div className="flex items-center gap-8" style={{ background: "rgba(202,138,4,.06)", border: "1px solid rgba(202,138,4,.25)", borderRadius: 8, padding: "10px 14px", flexWrap: "wrap" }}>
+              <span className="text-sm" style={{ color: "var(--amber)", flex: 1 }}>
+                Revert <strong>{deal.id}</strong> to <strong>{PREV_STATUS[deal.status]}</strong>?
+              </span>
+              <button className="btn btn-secondary btn-sm" onClick={() => setConfirmRevert(false)}>Cancel</button>
+              <button className="btn btn-amber btn-sm" onClick={() => { onUpdate(deal.id, PREV_STATUS[deal.status]); onClose(); }}>
+                Confirm Revert
+              </button>
+            </div>
+          )}
 
           <div className="divider" />
           {!confirmDelete ? (
@@ -2009,8 +2056,10 @@ const DECLINE_REASONS = [
 ];
 
 const DeclineModal = ({ deal, onClose, onConfirm }) => {
+  const hasBroker = !!deal.broker.email;
   const [reason, setReason] = useState(DECLINE_REASONS[0]);
   const [notes, setNotes] = useState("");
+  const [overrideEmail, setOverrideEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -2021,7 +2070,11 @@ const DeclineModal = ({ deal, onClose, onConfirm }) => {
       const res = await fetch(`/api/deals/${deal.id}/decline`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason, notes: notes.trim() || undefined }),
+        body: JSON.stringify({
+          reason,
+          notes: notes.trim() || undefined,
+          brokerEmail: !hasBroker && overrideEmail.trim() ? overrideEmail.trim() : undefined,
+        }),
       });
       if (!res.ok) { const d = await res.json(); setError(d.error ?? "Failed to decline."); setSubmitting(false); return; }
       onConfirm(deal.id);
@@ -2043,9 +2096,15 @@ const DeclineModal = ({ deal, onClose, onConfirm }) => {
           <button className="btn btn-secondary btn-sm" onClick={onClose}><Icon name="x" size={14} /></button>
         </div>
         <div className="modal-body">
-          <div style={{ background: "rgba(220,38,38,.06)", border: "1px solid rgba(220,38,38,.2)", borderRadius: 8, padding: "10px 14px", marginBottom: 20, fontSize: 13, color: "var(--red)" }}>
-            This will set the deal to <strong>Declined</strong> and notify the broker by email.
-          </div>
+          {hasBroker ? (
+            <div style={{ background: "rgba(220,38,38,.06)", border: "1px solid rgba(220,38,38,.2)", borderRadius: 8, padding: "10px 14px", marginBottom: 20, fontSize: 13, color: "var(--red)" }}>
+              This will set the deal to <strong>Declined</strong> and notify <strong>{deal.broker.email}</strong> by email.
+            </div>
+          ) : (
+            <div style={{ background: "rgba(202,138,4,.06)", border: "1px solid rgba(202,138,4,.25)", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "var(--amber)" }}>
+              <strong>No broker is attached to this deal.</strong> The decline will be recorded but no email will be sent unless you provide a broker email below.
+            </div>
+          )}
           <div className="form-group">
             <label className="form-label">Decline Reason</label>
             <select className="form-input" value={reason} onChange={e => setReason(e.target.value)}>
@@ -2056,13 +2115,25 @@ const DeclineModal = ({ deal, onClose, onConfirm }) => {
             <label className="form-label">Additional Notes <span className="text-dim">(optional)</span></label>
             <textarea
               className="form-input"
-              rows={4}
+              rows={3}
               value={notes}
               onChange={e => setNotes(e.target.value)}
               placeholder="Any additional context for the broker…"
               style={{ resize: "vertical" }}
             />
           </div>
+          {!hasBroker && (
+            <div className="form-group">
+              <label className="form-label">Broker Email to Notify <span className="text-dim">(optional)</span></label>
+              <input
+                className="form-input"
+                type="email"
+                value={overrideEmail}
+                onChange={e => setOverrideEmail(e.target.value)}
+                placeholder="broker@example.com"
+              />
+            </div>
+          )}
           {error && <div style={{ color: "var(--red)", fontSize: 13, marginTop: 8 }}>{error}</div>}
         </div>
         <div className="modal-footer">
@@ -2193,6 +2264,113 @@ const AddOffersModal = ({ deal, onClose, onOffersAdded }) => {
           <button className="btn btn-secondary" onClick={onClose} disabled={submitting}>Cancel</button>
           <button className="btn btn-green" onClick={handleSubmit} disabled={submitting || !offers[0].amount}>
             <Icon name="check" size={14} /> {submitting ? "Saving…" : "Save Offer & Advance to Offer Created"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── ASSIGN BROKER MODAL ─────────────────────────────────────────────────────
+const AssignBrokerModal = ({ deal, onClose, onAssigned }) => {
+  const [brokerShops, setBrokerShops] = useState([]);
+  const [shopSearch, setShopSearch] = useState("");
+  const [selectedShop, setSelectedShop] = useState(null);
+  const [selectedContact, setSelectedContact] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/broker-shops').then(r => r.json()).then(d => setBrokerShops(d.shops ?? [])).catch(() => {});
+  }, []);
+
+  const filtered = shopSearch.length > 0
+    ? brokerShops.filter(s => s.name.toLowerCase().includes(shopSearch.toLowerCase()))
+    : [];
+
+  const handleSelectShop = (shop) => {
+    setSelectedShop(shop);
+    setShopSearch(shop.name);
+    const primary = shop.contacts?.find(c => c.isPrimary) ?? shop.contacts?.[0];
+    setSelectedContact(primary ?? null);
+  };
+
+  const handleConfirm = async () => {
+    if (!selectedShop || !selectedContact) { setError("Select a shop and contact."); return; }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/deals/${deal.id}/assign-broker`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shopId: selectedShop.id, contactId: selectedContact.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "Failed to assign broker."); setSubmitting(false); return; }
+      onAssigned(data);
+      onClose();
+    } catch {
+      setError("Network error. Please try again.");
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">Assign Broker Shop</div>
+            <div className="modal-sub">{deal.merchant.name} · {deal.id}</div>
+          </div>
+          <button className="btn btn-secondary btn-sm" onClick={onClose}><Icon name="x" size={14} /></button>
+        </div>
+        <div className="modal-body">
+          <div className="form-group">
+            <label className="form-label">Search Broker Shop</label>
+            <input
+              className="form-input"
+              value={shopSearch}
+              onChange={e => { setShopSearch(e.target.value); setSelectedShop(null); setSelectedContact(null); }}
+              placeholder="Type to search shops…"
+            />
+          </div>
+          {shopSearch.length > 0 && !selectedShop && filtered.length > 0 && (
+            <div style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden", marginBottom: 12 }}>
+              {filtered.map(s => (
+                <button key={s.id} className="nav-item" style={{ width: "100%", textAlign: "left", borderRadius: 0, borderBottom: "1px solid var(--border)" }}
+                  onClick={() => handleSelectShop(s)}>
+                  <span className="fw-600">{s.name}</span>
+                  {s.email && <span className="text-dim text-xs" style={{ marginLeft: 8 }}>{s.email}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+          {shopSearch.length > 0 && !selectedShop && filtered.length === 0 && (
+            <div className="text-dim text-xs" style={{ marginBottom: 12 }}>No shops found.</div>
+          )}
+          {selectedShop && selectedShop.contacts?.length > 0 && (
+            <div className="form-group">
+              <label className="form-label">Select Contact</label>
+              <div style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+                {selectedShop.contacts.map(c => (
+                  <button key={c.id} className={`nav-item ${selectedContact?.id === c.id ? "active" : ""}`}
+                    style={{ width: "100%", textAlign: "left", borderRadius: 0, borderBottom: "1px solid var(--border)" }}
+                    onClick={() => setSelectedContact(c)}>
+                    <span className="fw-600">{c.name}</span>
+                    {c.isPrimary && <span style={{ fontSize: 10, background: "var(--accent)", color: "#fff", borderRadius: 4, padding: "1px 6px", marginLeft: 6 }}>Primary</span>}
+                    <span className="text-dim text-xs" style={{ marginLeft: 8 }}>{c.email}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {error && <div style={{ color: "var(--red)", fontSize: 13, marginTop: 8 }}>{error}</div>}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose} disabled={submitting}>Cancel</button>
+          <button className="btn btn-primary" onClick={handleConfirm} disabled={submitting || !selectedContact}>
+            <Icon name="check" size={14} /> {submitting ? "Assigning…" : "Assign Broker"}
           </button>
         </div>
       </div>
@@ -2448,6 +2626,7 @@ export default function App() {
   const [showSubmission, setShowSubmission] = useState(false);
   const [declineDeal, setDeclineDeal] = useState(null);
   const [createOfferDeal, setCreateOfferDeal] = useState(null);
+  const [assignBrokerDeal, setAssignBrokerDeal] = useState(null);
   const [brokerDeal, setBrokerDeal] = useState(null);
   const [merchantDeal, setMerchantDeal] = useState(null);
   const [uwDeal, setUwDeal] = useState(null);
@@ -2496,6 +2675,11 @@ export default function App() {
   const handleOffersAdded = (saved) => {
     setDeals(ds => ds.map(d => d.id === saved.id ? mapDeal(saved) : d));
     notify(`Offer created — deal advanced to Offer Created.`);
+  };
+
+  const handleBrokerAssigned = (saved) => {
+    setDeals(ds => ds.map(d => d.id === saved.id ? mapDeal(saved) : d));
+    notify(`Broker assigned to deal ${saved.id}.`);
   };
 
   const handleBrokerSelect = (id, offerId) => {
@@ -2623,6 +2807,7 @@ export default function App() {
           onOpenUW={d => { setSelectedDeal(null); setUwDeal(d); }}
           onDecline={d => { setSelectedDeal(null); setDeclineDeal(d); }}
           onCreateOffer={d => { setSelectedDeal(null); setCreateOfferDeal(d); }}
+          onAssignBroker={d => { setSelectedDeal(null); setAssignBrokerDeal(d); }}
         />
       )}
       {showNewDeal && (
@@ -2649,6 +2834,13 @@ export default function App() {
           deal={deals.find(d => d.id === createOfferDeal.id) || createOfferDeal}
           onClose={() => setCreateOfferDeal(null)}
           onOffersAdded={handleOffersAdded}
+        />
+      )}
+      {assignBrokerDeal && (
+        <AssignBrokerModal
+          deal={deals.find(d => d.id === assignBrokerDeal.id) || assignBrokerDeal}
+          onClose={() => setAssignBrokerDeal(null)}
+          onAssigned={handleBrokerAssigned}
         />
       )}
       {brokerDeal && (

@@ -11,7 +11,7 @@ export async function POST(
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
-  const { reason, notes } = await request.json()
+  const { reason, notes, brokerEmail: overrideEmail } = await request.json()
 
   if (!reason) return NextResponse.json({ error: 'reason is required' }, { status: 400 })
 
@@ -21,12 +21,23 @@ export async function POST(
     include: { brokerContact: true, merchantContact: true },
   })
 
+  const merchantName = deal.merchantContact?.businessName ?? 'Merchant'
+
   if (deal.brokerContact) {
     sendDeclineEmail({
       dealId: deal.id,
       brokerName: deal.brokerContact.name,
       brokerEmail: deal.brokerContact.email,
-      merchantName: deal.merchantContact?.businessName ?? 'Merchant',
+      merchantName,
+      reason,
+      notes: notes || undefined,
+    }).catch(console.error)
+  } else if (overrideEmail) {
+    sendDeclineEmail({
+      dealId: deal.id,
+      brokerName: 'Broker',
+      brokerEmail: overrideEmail,
+      merchantName,
       reason,
       notes: notes || undefined,
     }).catch(console.error)
