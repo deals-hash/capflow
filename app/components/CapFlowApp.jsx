@@ -82,6 +82,7 @@ const STATUS_COLORS = {
   "Ready for Final UW": "#f97316",
   "UW Approved": "#22c55e",
   "UW Declined": "#ef4444",
+  "Declined": "#ef4444",
   "Funding Call Completed": "#84cc16",
   "Funded": "#16a34a",
 };
@@ -573,7 +574,7 @@ const Toast = ({ msg, onClose }) => {
 };
 
 // ─── DEAL DETAIL MODAL ───────────────────────────────────────────────────────
-const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOpenMerchant, onOpenUW }) => {
+const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOpenMerchant, onOpenUW, onDecline, onCreateOffer }) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [fullDeal, setFullDeal] = useState(null);
   const [docsLoading, setDocsLoading] = useState(false);
@@ -809,9 +810,14 @@ const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOp
           <div className="section-title mb-12">Actions</div>
           <div className="flex" style={{ gap: 8, flexWrap: "wrap" }}>
             {deal.status === "Submission Received" && (
-              <button className="btn btn-primary" onClick={() => { onUpdate(deal.id, "Offer Created"); onClose(); onNewDeal && onNewDeal(); }}>
-                <Icon name="plus" size={15} /> Create Offer
-              </button>
+              <>
+                <button className="btn btn-green" onClick={() => { onClose(); onCreateOffer && onCreateOffer(deal); }}>
+                  <Icon name="plus" size={15} /> Create Offer
+                </button>
+                <button className="btn btn-red" onClick={() => { onClose(); onDecline && onDecline(deal); }}>
+                  <Icon name="x" size={15} /> Decline Deal
+                </button>
+              </>
             )}
             {deal.status === "Offer Created" && (
               <button className="btn btn-primary" onClick={() => { onUpdate(deal.id, "Offer Sent to Broker"); onClose(); }}>
@@ -1984,6 +1990,208 @@ const NotificationsPanel = ({ deals }) => {
   );
 };
 
+// ─── DECLINE MODAL ───────────────────────────────────────────────────────────
+const DECLINE_REASONS = [
+  "Insufficient Revenue",
+  "Too Many Positions",
+  "Credit Issues",
+  "Insufficient Time in Business",
+  "Incomplete Application",
+  "Other",
+];
+
+const DeclineModal = ({ deal, onClose, onConfirm }) => {
+  const [reason, setReason] = useState(DECLINE_REASONS[0]);
+  const [notes, setNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleConfirm = async () => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/deals/${deal.id}/decline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason, notes: notes.trim() || undefined }),
+      });
+      if (!res.ok) { const d = await res.json(); setError(d.error ?? "Failed to decline."); setSubmitting(false); return; }
+      onConfirm(deal.id);
+      onClose();
+    } catch {
+      setError("Network error. Please try again.");
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title" style={{ color: "var(--red)" }}>Decline Deal</div>
+            <div className="modal-sub mono text-xs">{deal.id} · {deal.merchant.name}</div>
+          </div>
+          <button className="btn btn-secondary btn-sm" onClick={onClose}><Icon name="x" size={14} /></button>
+        </div>
+        <div className="modal-body">
+          <div style={{ background: "rgba(220,38,38,.06)", border: "1px solid rgba(220,38,38,.2)", borderRadius: 8, padding: "10px 14px", marginBottom: 20, fontSize: 13, color: "var(--red)" }}>
+            This will set the deal to <strong>Declined</strong> and notify the broker by email.
+          </div>
+          <div className="form-group">
+            <label className="form-label">Decline Reason</label>
+            <select className="form-input" value={reason} onChange={e => setReason(e.target.value)}>
+              {DECLINE_REASONS.map(r => <option key={r}>{r}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Additional Notes <span className="text-dim">(optional)</span></label>
+            <textarea
+              className="form-input"
+              rows={4}
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Any additional context for the broker…"
+              style={{ resize: "vertical" }}
+            />
+          </div>
+          {error && <div style={{ color: "var(--red)", fontSize: 13, marginTop: 8 }}>{error}</div>}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose} disabled={submitting}>Cancel</button>
+          <button className="btn btn-red" onClick={handleConfirm} disabled={submitting}>
+            <Icon name="x" size={14} /> {submitting ? "Declining…" : "Confirm Decline"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── ADD OFFERS MODAL ────────────────────────────────────────────────────────
+const AddOffersModal = ({ deal, onClose, onOffersAdded }) => {
+  const [offers, setOffers] = useState([{
+    amount: "", payback: "", factor: "", term: "", frequency: "Daily",
+    position: "1st", fee: "", expiry: "", commissionPct: "",
+  }]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+
+  const setO = (i, k, v) => setOffers(o => o.map((x, j) => j === i ? { ...x, [k]: v } : x));
+
+  const handleSubmit = async () => {
+    if (!offers[0].amount) { setError("Enter at least one offer amount."); return; }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/deals/${deal.id}/offers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ offers }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "Failed to save offers."); setSubmitting(false); return; }
+      onOffersAdded(data);
+      onClose();
+    } catch {
+      setError("Network error. Please try again.");
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">Create Offer</div>
+            <div className="modal-sub">{deal.merchant.name} · {deal.id}</div>
+          </div>
+          <button className="btn btn-secondary btn-sm" onClick={onClose}><Icon name="x" size={14} /></button>
+        </div>
+        <div className="modal-body">
+          {offers.map((o, i) => (
+            <div key={i} className="card card-sm mb-12" style={{ background: "var(--bg)" }}>
+              <div className="flex justify-between mb-12">
+                <span className="fw-600 text-sm">Offer {i + 1}</span>
+                {offers.length > 1 && <button className="btn btn-secondary btn-sm" onClick={() => setOffers(os => os.filter((_, j) => j !== i))}>Remove</button>}
+              </div>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label className="form-label">Advance Amount</label>
+                  <CurrencyInput value={o.amount} placeholder="50000" onChange={amt => {
+                    const updates = { amount: amt };
+                    if (amt && o.factor) updates.payback = (parseFloat(amt) * parseFloat(o.factor)).toFixed(0);
+                    setOffers(os => os.map((x, j) => j === i ? { ...x, ...updates } : x));
+                  }} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Factor Rate</label>
+                  <input className="form-input" type="number" step=".01" value={o.factor} placeholder="1.35"
+                    onChange={e => {
+                      const fac = e.target.value;
+                      const updates = { factor: fac };
+                      if (fac && o.amount) updates.payback = (parseFloat(o.amount) * parseFloat(fac)).toFixed(2);
+                      setOffers(os => os.map((x, j) => j === i ? { ...x, ...updates } : x));
+                    }} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Total Payback {o.amount && o.factor && <span style={{ color: "var(--green)", fontSize: 10, marginLeft: 6 }}>● AUTO</span>}</label>
+                  <CurrencyInput value={o.payback} placeholder="auto-calculates"
+                    style={{ borderColor: o.amount && o.factor ? "var(--accent)" : undefined }}
+                    onChange={pb => {
+                      const updates = { payback: pb };
+                      if (pb && o.amount) updates.factor = (parseFloat(pb) / parseFloat(o.amount)).toFixed(4);
+                      setOffers(os => os.map((x, j) => j === i ? { ...x, ...updates } : x));
+                    }} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Term ({o.frequency === "Daily" ? "business days" : o.frequency === "Weekly" ? "weeks" : "months"})</label>
+                  <input className="form-input" type="number" value={o.term} onChange={e => setO(i, "term", e.target.value)} placeholder="120" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">ACH Frequency</label>
+                  <select className="form-input" value={o.frequency} onChange={e => setO(i, "frequency", e.target.value)}>
+                    <option>Daily</option><option>Weekly</option><option>Monthly</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Position</label>
+                  <select className="form-input" value={o.position} onChange={e => setO(i, "position", e.target.value)}>
+                    <option>1st</option><option>2nd</option><option>3rd</option><option>4th</option><option>5th</option><option>6th</option><option>7th</option><option>8th</option><option>9th</option><option>10th</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Origination Fee %</label>
+                  <input className="form-input" type="number" step="0.1" value={o.fee} onChange={e => setO(i, "fee", e.target.value)} placeholder="1" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Commission %</label>
+                  <input className="form-input" type="number" step="0.1" value={o.commissionPct} onChange={e => setO(i, "commissionPct", e.target.value)} placeholder="10" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Offer Expiry</label>
+                  <input className="form-input" type="date" value={o.expiry} onChange={e => setO(i, "expiry", e.target.value)} />
+                </div>
+              </div>
+            </div>
+          ))}
+          <button className="btn btn-secondary btn-sm" onClick={() => setOffers(o => [...o, { amount: "", payback: "", factor: "", term: "", frequency: "Daily", position: "1st", fee: "", expiry: "", commissionPct: "" }])}>
+            <Icon name="plus" size={14} /> Add Another Offer
+          </button>
+          {error && <div style={{ color: "var(--red)", fontSize: 13, marginTop: 12 }}>{error}</div>}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose} disabled={submitting}>Cancel</button>
+          <button className="btn btn-green" onClick={handleSubmit} disabled={submitting || !offers[0].amount}>
+            <Icon name="check" size={14} /> {submitting ? "Saving…" : "Save Offer & Advance to Offer Created"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── SUBMISSION MODAL ────────────────────────────────────────────────────────
 const SubmissionModal = ({ onClose, onCreate }) => {
   const [phase, setPhase] = useState('upload'); // 'upload' | 'processing' | 'review'
@@ -2036,16 +2244,18 @@ const SubmissionModal = ({ onClose, onCreate }) => {
   };
 
   const handleCreate = () => {
-    const dealData = {
-      merchantName: extracted.businessName,
-      merchantEmail: extracted.email,
-      merchantPhone: extracted.phone,
-      brokerName: '',
-      brokerEmail: '',
+    onCreate({
+      merchant: {
+        name: extracted.businessName || 'Unknown Business',
+        email: extracted.email || `submission-${Date.now()}@placeholder.internal`,
+        phone: extracted.phone || '',
+      },
+      broker: { name: '', email: '' },
       requestedAmount: parseFloat(extracted.requestedAmount) || 0,
       notes: [extracted.industry, extracted.address, extracted.notes].filter(Boolean).join(' | '),
-    };
-    onCreate(dealData);
+      status: 'Submission Received',
+      offers: [],
+    });
     onClose();
   };
 
@@ -2202,6 +2412,8 @@ export default function App() {
   const [selectedDeal, setSelectedDeal] = useState(null);
   const [showNewDeal, setShowNewDeal] = useState(false);
   const [showSubmission, setShowSubmission] = useState(false);
+  const [declineDeal, setDeclineDeal] = useState(null);
+  const [createOfferDeal, setCreateOfferDeal] = useState(null);
   const [brokerDeal, setBrokerDeal] = useState(null);
   const [merchantDeal, setMerchantDeal] = useState(null);
   const [uwDeal, setUwDeal] = useState(null);
@@ -2235,19 +2447,21 @@ export default function App() {
       .catch(() => notify('Failed to create deal'));
   };
 
-  const handleSubmissionCreate = (extracted) => {
-    const dealData = {
-      merchant: { name: extracted.merchantName || '', email: extracted.merchantEmail || '', phone: extracted.merchantPhone || '' },
-      broker: { name: extracted.brokerName || '', email: extracted.brokerEmail || '' },
-      requestedAmount: extracted.requestedAmount || 0,
-      notes: extracted.notes || '',
-      status: 'Submission Received',
-      offers: [],
-    };
+  const handleSubmissionCreate = (dealData) => {
     fetch('/api/deals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dealData) })
       .then(r => r.json())
-      .then(saved => { setDeals(ds => [mapDeal(saved), ...ds]); notify(`Deal created from submission!`); setView('deals'); })
+      .then(saved => { setDeals(ds => [mapDeal(saved), ...ds]); notify(`Submission received — deal created!`); setView('deals'); })
       .catch(() => notify('Failed to create deal from submission'));
+  };
+
+  const handleDeclined = (dealId) => {
+    setDeals(ds => ds.map(d => d.id === dealId ? { ...d, status: 'Declined' } : d));
+    notify(`Deal ${dealId} declined. Broker notified.`);
+  };
+
+  const handleOffersAdded = (saved) => {
+    setDeals(ds => ds.map(d => d.id === saved.id ? mapDeal(saved) : d));
+    notify(`Offer created — deal advanced to Offer Created.`);
   };
 
   const handleBrokerSelect = (id, offerId) => {
@@ -2373,6 +2587,8 @@ export default function App() {
           onOpenBroker={d => { setSelectedDeal(null); setBrokerDeal(d); }}
           onOpenMerchant={d => { setSelectedDeal(null); setMerchantDeal(d); }}
           onOpenUW={d => { setSelectedDeal(null); setUwDeal(d); }}
+          onDecline={d => { setSelectedDeal(null); setDeclineDeal(d); }}
+          onCreateOffer={d => { setSelectedDeal(null); setCreateOfferDeal(d); }}
         />
       )}
       {showNewDeal && (
@@ -2385,6 +2601,20 @@ export default function App() {
         <SubmissionModal
           onClose={() => setShowSubmission(false)}
           onCreate={handleSubmissionCreate}
+        />
+      )}
+      {declineDeal && (
+        <DeclineModal
+          deal={declineDeal}
+          onClose={() => setDeclineDeal(null)}
+          onConfirm={handleDeclined}
+        />
+      )}
+      {createOfferDeal && (
+        <AddOffersModal
+          deal={deals.find(d => d.id === createOfferDeal.id) || createOfferDeal}
+          onClose={() => setCreateOfferDeal(null)}
+          onOffersAdded={handleOffersAdded}
         />
       )}
       {brokerDeal && (

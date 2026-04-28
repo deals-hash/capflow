@@ -281,3 +281,74 @@ export async function sendMerchantInviteEmail({
     html,
   })
 }
+
+export async function sendDeclineEmail({
+  dealId,
+  brokerName,
+  brokerEmail,
+  merchantName,
+  reason,
+  notes,
+}: {
+  dealId: string
+  brokerName: string
+  brokerEmail: string
+  merchantName: string
+  reason: string
+  notes?: string
+}) {
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#111111;">
+  <div style="max-width:580px;margin:0 auto;padding:24px 16px 48px;">
+    ${testBanner(brokerEmail)}
+    ${logoHtml()}
+
+    <div style="background:#1c1c1c;border:1px solid #2a2a2a;border-radius:20px;overflow:hidden;margin-bottom:24px;">
+      <div style="background:#dc2626;padding:6px 20px;text-align:center;">
+        <span style="font-size:11px;font-weight:800;color:#ffffff;text-transform:uppercase;letter-spacing:0.12em;">Application Update</span>
+      </div>
+      <div style="padding:36px 32px;">
+        <div style="font-size:13px;color:#888888;margin-bottom:6px;font-family:sans-serif;">Hi ${brokerName},</div>
+        <div style="font-size:22px;font-weight:800;color:#ffffff;margin-bottom:12px;font-family:sans-serif;">
+          ${merchantName} — Application Declined
+        </div>
+        <div style="font-size:14px;color:#888888;line-height:1.6;margin-bottom:24px;font-family:sans-serif;">
+          After careful review, we are unable to approve funding for this application at this time.
+        </div>
+
+        <div style="background:#111111;border:1px solid #2a2a2a;border-radius:12px;padding:20px 24px;${notes ? 'margin-bottom:16px;' : ''}">
+          <div style="font-size:11px;font-weight:700;color:#888888;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Decline Reason</div>
+          <div style="font-size:15px;font-weight:700;color:#ffffff;">${reason}</div>
+        </div>
+
+        ${notes ? `
+        <div style="background:#111111;border:1px solid #2a2a2a;border-radius:12px;padding:20px 24px;">
+          <div style="font-size:11px;font-weight:700;color:#888888;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Additional Notes</div>
+          <div style="font-size:14px;color:#cccccc;line-height:1.6;">${notes}</div>
+        </div>` : ''}
+      </div>
+    </div>
+
+    <div style="text-align:center;font-size:12px;color:#333333;font-family:sans-serif;">
+      Powered by YoyoFunding &middot; Deal ID: ${dealId}
+    </div>
+  </div>
+</body>
+</html>`
+
+  const to = resolveRecipient(brokerEmail)
+  console.log(`[email] sendDeclineEmail → to=${to} deal=${dealId}`)
+
+  const result = await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `Application Update — ${merchantName}`,
+    html,
+  })
+
+  console.log(`[email] sendDeclineEmail result:`, JSON.stringify(result))
+  return result
+}

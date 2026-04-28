@@ -34,19 +34,20 @@ export async function POST(request: NextRequest) {
   const { merchant, broker, offers: offerData, status } = body
 
   // Full UI shape — create/upsert contacts and offers inline
-  if (merchant?.email && broker?.email) {
-    const [brokerContact, merchantContact] = await Promise.all([
-      prisma.brokerContact.upsert({
-        where: { email: broker.email },
-        update: { name: broker.name },
-        create: { name: broker.name, email: broker.email },
-      }),
-      prisma.merchantContact.upsert({
-        where: { email: merchant.email },
-        update: { businessName: merchant.name, ownerName: merchant.name, phone: merchant.phone ?? null },
-        create: { businessName: merchant.name, ownerName: merchant.name, email: merchant.email, phone: merchant.phone ?? null },
-      }),
-    ])
+  if (merchant?.email) {
+    const merchantContact = await prisma.merchantContact.upsert({
+      where: { email: merchant.email },
+      update: { businessName: merchant.name, ownerName: merchant.name, phone: merchant.phone ?? null },
+      create: { businessName: merchant.name, ownerName: merchant.name, email: merchant.email, phone: merchant.phone ?? null },
+    })
+
+    const brokerContact = broker?.email
+      ? await prisma.brokerContact.upsert({
+          where: { email: broker.email },
+          update: { name: broker.name },
+          create: { name: broker.name, email: broker.email },
+        })
+      : null
 
     const firstAmount = offerData?.[0]?.amount ? parseFloat(offerData[0].amount) : 0
 
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
       data: {
         requestedAmount: firstAmount,
         status: status ?? 'Offer Created',
-        brokerContactId: brokerContact.id,
+        brokerContactId: brokerContact?.id ?? undefined,
         merchantContactId: merchantContact.id,
         offers: offerData?.length ? {
           create: offerData.map((o: Record<string, string>) => ({
