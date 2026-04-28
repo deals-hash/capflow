@@ -18,7 +18,6 @@ const PROMPT = `Extract the following fields from this document. Return a JSON o
 - industry: string (type of business / industry)
 - notes: string (any relevant details: monthly revenue, years in business, MCA history, etc.)
 - ein: string (Business EIN in format XX-XXXXXXX, null if not found)
-- ownerEin: string (Owner/individual EIN if different from business EIN, null if not found)
 - ownerDob: string (Owner date of birth in format MM/DD/YYYY, null if not found)
 - ownerSsnLast4: string (LAST 4 DIGITS ONLY of owner SSN — never extract or return the full SSN, null if not found)
 

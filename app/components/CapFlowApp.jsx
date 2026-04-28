@@ -2387,7 +2387,7 @@ const SubmissionModal = ({ onClose, onCreate }) => {
   const [extracted, setExtracted] = useState({
     businessName: '', ownerName: '', email: '', phone: '',
     address: '', requestedAmount: '', industry: '', notes: '',
-    ein: '', ownerEin: '', ownerDob: '', ownerSsnLast4: '',
+    ein: '', ownerDob: '', ownerSsnLast4: '',
   });
   const fileInputRef = { current: null };
 
@@ -2423,7 +2423,6 @@ const SubmissionModal = ({ onClose, onCreate }) => {
         industry: data.extracted.industry ?? '',
         notes: data.extracted.notes ?? '',
         ein: data.extracted.ein ?? '',
-        ownerEin: data.extracted.ownerEin ?? '',
         ownerDob: data.extracted.ownerDob ?? '',
         ownerSsnLast4: data.extracted.ownerSsnLast4 ?? '',
       });
@@ -2442,7 +2441,6 @@ const SubmissionModal = ({ onClose, onCreate }) => {
         phone: extracted.phone || '',
         ownerName: extracted.ownerName || '',
         ein: extracted.ein || null,
-        ownerEin: extracted.ownerEin || null,
         ownerDob: extracted.ownerDob || null,
         ownerSsnLast4: extracted.ownerSsnLast4 || null,
       },
@@ -2574,10 +2572,6 @@ const SubmissionModal = ({ onClose, onCreate }) => {
                 <div className="form-group">
                   <label className="form-label">Business EIN</label>
                   <input className="form-input" value={extracted.ein} onChange={e => set('ein', e.target.value)} placeholder="XX-XXXXXXX" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Owner EIN <span className="text-dim">(if different)</span></label>
-                  <input className="form-input" value={extracted.ownerEin} onChange={e => set('ownerEin', e.target.value)} placeholder="XX-XXXXXXX" />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Owner Date of Birth</label>
