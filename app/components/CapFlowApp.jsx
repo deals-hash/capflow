@@ -94,8 +94,14 @@ function mapDeal(d) {
     status: d.status,
     created: d.createdAt ? d.createdAt.split('T')[0] : '',
     merchant: d.merchantContact
-      ? { name: d.merchantContact.businessName, email: d.merchantContact.email, phone: d.merchantContact.phone || '' }
-      : { name: '', email: '', phone: '' },
+      ? {
+          name: d.merchantContact.businessName,
+          email: d.merchantContact.email,
+          phone: d.merchantContact.phone || '',
+          ein: d.merchantContact.ein || '',
+          ownerDob: d.merchantContact.ownerDob || '',
+        }
+      : { name: '', email: '', phone: '', ein: '', ownerDob: '' },
     broker: d.brokerContact
       ? { name: d.brokerContact.name, email: d.brokerContact.email, phone: d.brokerContact.phone || '', shopName: d.brokerShop?.name || d.brokerContact.company || '' }
       : { name: '', email: '', phone: '', shopName: '' },
@@ -655,6 +661,8 @@ const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOp
                 ["Business", deal.merchant.name],
                 ["Email", deal.merchant.email],
                 ["Phone", deal.merchant.phone],
+                ["EIN", deal.merchant.ein],
+                ["DOB", deal.merchant.ownerDob],
               ].map(([label, val]) => val ? (
                 <div key={label} className="flex items-center gap-8" style={{ marginBottom: 6 }}>
                   <span className="text-xs text-dim" style={{ width: 48, flexShrink: 0 }}>{label}</span>
@@ -2201,6 +2209,7 @@ const SubmissionModal = ({ onClose, onCreate }) => {
   const [extracted, setExtracted] = useState({
     businessName: '', ownerName: '', email: '', phone: '',
     address: '', requestedAmount: '', industry: '', notes: '',
+    ein: '', ownerEin: '', ownerDob: '', ownerSsnLast4: '',
   });
   const fileInputRef = { current: null };
 
@@ -2235,6 +2244,10 @@ const SubmissionModal = ({ onClose, onCreate }) => {
         requestedAmount: data.extracted.requestedAmount ? String(data.extracted.requestedAmount) : '',
         industry: data.extracted.industry ?? '',
         notes: data.extracted.notes ?? '',
+        ein: data.extracted.ein ?? '',
+        ownerEin: data.extracted.ownerEin ?? '',
+        ownerDob: data.extracted.ownerDob ?? '',
+        ownerSsnLast4: data.extracted.ownerSsnLast4 ?? '',
       });
       setPhase('review');
     } catch {
@@ -2249,6 +2262,11 @@ const SubmissionModal = ({ onClose, onCreate }) => {
         name: extracted.businessName || 'Unknown Business',
         email: extracted.email || `submission-${Date.now()}@placeholder.internal`,
         phone: extracted.phone || '',
+        ownerName: extracted.ownerName || '',
+        ein: extracted.ein || null,
+        ownerEin: extracted.ownerEin || null,
+        ownerDob: extracted.ownerDob || null,
+        ownerSsnLast4: extracted.ownerSsnLast4 || null,
       },
       broker: { name: '', email: '' },
       requestedAmount: parseFloat(extracted.requestedAmount) || 0,
@@ -2374,6 +2392,22 @@ const SubmissionModal = ({ onClose, onCreate }) => {
                 <div className="form-group">
                   <label className="form-label">Industry</label>
                   <input className="form-input" value={extracted.industry} onChange={e => set('industry', e.target.value)} placeholder="Restaurant, Retail…" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Business EIN</label>
+                  <input className="form-input" value={extracted.ein} onChange={e => set('ein', e.target.value)} placeholder="XX-XXXXXXX" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Owner EIN <span className="text-dim">(if different)</span></label>
+                  <input className="form-input" value={extracted.ownerEin} onChange={e => set('ownerEin', e.target.value)} placeholder="XX-XXXXXXX" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Owner Date of Birth</label>
+                  <input className="form-input" value={extracted.ownerDob} onChange={e => set('ownerDob', e.target.value)} placeholder="MM/DD/YYYY" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Owner SSN <span className="text-dim">(last 4 only)</span></label>
+                  <input className="form-input" value={extracted.ownerSsnLast4} onChange={e => set('ownerSsnLast4', e.target.value)} placeholder="XXXX" maxLength={4} />
                 </div>
               </div>
               <div className="form-group">

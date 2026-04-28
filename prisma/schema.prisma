@@ -105,6 +105,9 @@ model MerchantContact {
   email        String   @unique
   phone        String?
   ein          String?
+  ownerEin     String?
+  ownerDob     String?
+  ownerSsnLast4 String?
   deals        Deal[]
 }
 

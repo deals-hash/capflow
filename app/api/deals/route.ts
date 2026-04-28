@@ -37,8 +37,25 @@ export async function POST(request: NextRequest) {
   if (merchant?.email) {
     const merchantContact = await prisma.merchantContact.upsert({
       where: { email: merchant.email },
-      update: { businessName: merchant.name, ownerName: merchant.name, phone: merchant.phone ?? null },
-      create: { businessName: merchant.name, ownerName: merchant.name, email: merchant.email, phone: merchant.phone ?? null },
+      update: {
+        businessName: merchant.name,
+        ownerName: merchant.ownerName ?? merchant.name,
+        phone: merchant.phone ?? null,
+        ein: merchant.ein ?? null,
+        ownerEin: merchant.ownerEin ?? null,
+        ownerDob: merchant.ownerDob ?? null,
+        ownerSsnLast4: merchant.ownerSsnLast4 ?? null,
+      },
+      create: {
+        businessName: merchant.name,
+        ownerName: merchant.ownerName ?? merchant.name,
+        email: merchant.email,
+        phone: merchant.phone ?? null,
+        ein: merchant.ein ?? null,
+        ownerEin: merchant.ownerEin ?? null,
+        ownerDob: merchant.ownerDob ?? null,
+        ownerSsnLast4: merchant.ownerSsnLast4 ?? null,
+      },
     })
 
     const brokerContact = broker?.email
