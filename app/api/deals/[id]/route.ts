@@ -53,6 +53,7 @@ export async function PATCH(
     include: {
       brokerContact: true,
       merchantContact: true,
+      brokerShop: true,
       offers: true,
     },
   })

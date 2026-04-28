@@ -120,7 +120,9 @@ function mapDeal(d) {
       : { name: '', email: '', phone: '', ein: '', ownerDob: '' },
     broker: d.brokerContact
       ? { name: d.brokerContact.name, email: d.brokerContact.email, phone: d.brokerContact.phone || '', shopName: d.brokerShop?.name || d.brokerContact.company || '' }
-      : { name: '', email: '', phone: '', shopName: '' },
+      : d.brokerShop
+        ? { name: '', email: '', phone: '', shopName: d.brokerShop.name }
+        : { name: '', email: '', phone: '', shopName: '' },
     offers: (d.offers || []).map(o => ({
       id: o.id,
       amount: o.amount,
@@ -2296,14 +2298,16 @@ const AssignBrokerModal = ({ deal, onClose, onAssigned }) => {
   };
 
   const handleConfirm = async () => {
-    if (!selectedShop || !selectedContact) { setError("Select a shop and contact."); return; }
+    if (!selectedShop) { setError("Select a broker shop."); return; }
     setSubmitting(true);
     setError(null);
+    const patchBody = { brokerShopId: selectedShop.id };
+    if (selectedContact) patchBody.brokerContactId = selectedContact.id;
     try {
-      const res = await fetch(`/api/deals/${deal.id}/assign-broker`, {
-        method: "POST",
+      const res = await fetch(`/api/deals/${deal.id}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shopId: selectedShop.id, contactId: selectedContact.id }),
+        body: JSON.stringify(patchBody),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Failed to assign broker."); setSubmitting(false); return; }
@@ -2369,7 +2373,7 @@ const AssignBrokerModal = ({ deal, onClose, onAssigned }) => {
         </div>
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose} disabled={submitting}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleConfirm} disabled={submitting || !selectedContact}>
+          <button className="btn btn-primary" onClick={handleConfirm} disabled={submitting || !selectedShop}>
             <Icon name="check" size={14} /> {submitting ? "Assigning…" : "Assign Broker"}
           </button>
         </div>
