@@ -68,14 +68,6 @@ function cleanJson(raw: string): unknown {
 }
 
 export async function POST(request: NextRequest) {
-  const token = process.env.POSTMARK_INBOUND_WEBHOOK_TOKEN
-  if (token) {
-    const auth = request.headers.get('authorization') ?? ''
-    if (auth !== `Bearer ${token}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-  }
-
   let body: PostmarkPayload
   try {
     body = await request.json()
