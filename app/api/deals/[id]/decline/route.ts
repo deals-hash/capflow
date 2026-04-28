@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { sendDeclineEmail } from '@/lib/email'
+import { sendDeclineEmail, sendDeclineThreadReply } from '@/lib/email'
 
 export async function POST(
   request: NextRequest,
@@ -15,15 +15,35 @@ export async function POST(
 
   if (!reason) return NextResponse.json({ error: 'reason is required' }, { status: 400 })
 
-  const deal = await prisma.deal.update({
-    where: { id },
-    data: { status: 'Declined' },
-    include: { brokerContact: true, merchantContact: true },
-  })
+  const [deal, emailSub] = await Promise.all([
+    prisma.deal.update({
+      where: { id },
+      data: { status: 'Declined' },
+      include: { brokerContact: true, merchantContact: true },
+    }),
+    prisma.emailSubmission.findFirst({
+      where: { dealId: id },
+      orderBy: { createdAt: 'asc' },
+    }),
+  ])
 
   const merchantName = deal.merchantContact?.businessName ?? 'Merchant'
 
-  if (deal.brokerContact) {
+  if (emailSub?.messageId) {
+    const brokerEmail = emailSub.fromEmail
+    const brokerName = emailSub.fromName || brokerEmail
+    sendDeclineThreadReply({
+      dealId: deal.id,
+      brokerName,
+      brokerEmail,
+      merchantName,
+      reason,
+      notes: notes || undefined,
+      originalMessageId: emailSub.messageId,
+      originalSubject: emailSub.subject ?? 'Your Submission',
+      ccEmails: emailSub.ccEmails,
+    }).catch(console.error)
+  } else if (deal.brokerContact) {
     sendDeclineEmail({
       dealId: deal.id,
       brokerName: deal.brokerContact.name,

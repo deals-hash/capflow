@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { prisma } from '@/lib/prisma'
+import { sendSubmissionAckReply } from '@/lib/email'
 
 const client = new Anthropic()
 const resend = new Resend(process.env.RESEND_API_KEY)
@@ -197,6 +198,17 @@ export async function POST(request: NextRequest) {
     })
 
     dealId = deal.id
+
+    sendSubmissionAckReply({
+      dealId: deal.id,
+      brokerName: fromName || fromEmail,
+      brokerEmail: fromEmail,
+      merchantName,
+      originalMessageId: messageId,
+      originalSubject: subject,
+      ccEmails,
+    }).catch(err => console.error('[inbound/email] ack reply error', err))
+
     break
   }
 

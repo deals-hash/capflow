@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import type { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { sendBrokerOfferEmail, sendMerchantInviteEmail } from '@/lib/email'
+import { sendBrokerOfferEmail, sendMerchantInviteEmail, sendApprovalThreadReply } from '@/lib/email'
 
 export async function GET(
   _request: NextRequest,
@@ -78,6 +78,24 @@ export async function PATCH(
     }).catch(console.error)
   }
 
+  if (body?.status === 'UW Approved') {
+    const emailSub = await prisma.emailSubmission.findFirst({
+      where: { dealId: deal.id },
+      orderBy: { createdAt: 'asc' },
+    })
+    if (emailSub?.messageId && deal.brokerContact) {
+      sendApprovalThreadReply({
+        dealId: deal.id,
+        brokerName: emailSub.fromName || emailSub.fromEmail,
+        brokerEmail: emailSub.fromEmail,
+        merchantName: deal.merchantContact?.businessName ?? 'Merchant',
+        originalMessageId: emailSub.messageId,
+        originalSubject: emailSub.subject ?? 'Your Submission',
+        ccEmails: emailSub.ccEmails,
+      }).catch(console.error)
+    }
+  }
+
   return Response.json(deal)
 }
 
@@ -100,6 +118,7 @@ export async function DELETE(
     prisma.agreementRecord.deleteMany({ where: { dealId: id } }),
     prisma.notificationLog.deleteMany({ where: { dealId: id } }),
     prisma.underwritingDecision.deleteMany({ where: { dealId: id } }),
+    prisma.emailSubmission.deleteMany({ where: { dealId: id } }),
     prisma.deal.delete({ where: { id } }),
   ])
 

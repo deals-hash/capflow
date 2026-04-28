@@ -352,3 +352,235 @@ export async function sendDeclineEmail({
   console.log(`[email] sendDeclineEmail result:`, JSON.stringify(result))
   return result
 }
+
+// ─── THREAD REPLY HELPERS ─────────────────────────────────────────────────────
+
+function threadHeaders(originalMessageId: string) {
+  const mid = originalMessageId.startsWith('<') ? originalMessageId : `<${originalMessageId}>`
+  return { 'In-Reply-To': mid, 'References': mid }
+}
+
+function reSubject(subject: string) {
+  return subject.toLowerCase().startsWith('re:') ? subject : `Re: ${subject}`
+}
+
+function buildCcList(ccEmails: string[], excludeEmail: string): string[] {
+  const resolved = ccEmails.map(e => resolveRecipient(e))
+  return [...new Set(resolved)].filter(e => e !== resolveRecipient(excludeEmail))
+}
+
+export async function sendSubmissionAckReply({
+  dealId,
+  brokerName,
+  brokerEmail,
+  merchantName,
+  originalMessageId,
+  originalSubject,
+  ccEmails,
+}: {
+  dealId: string
+  brokerName: string
+  brokerEmail: string
+  merchantName: string
+  originalMessageId: string
+  originalSubject: string
+  ccEmails: string[]
+}) {
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#111111;">
+  <div style="max-width:580px;margin:0 auto;padding:24px 16px 48px;">
+    ${testBanner(brokerEmail)}
+    ${logoHtml()}
+    <div style="background:#1c1c1c;border:1px solid #2a2a2a;border-radius:20px;overflow:hidden;margin-bottom:24px;">
+      <div style="background:#d4af37;padding:6px 20px;text-align:center;">
+        <span style="font-size:11px;font-weight:800;color:#111111;text-transform:uppercase;letter-spacing:0.12em;">Submission Received</span>
+      </div>
+      <div style="padding:36px 32px;">
+        <div style="font-size:13px;color:#888888;margin-bottom:6px;font-family:sans-serif;">Hi ${brokerName},</div>
+        <div style="font-size:22px;font-weight:800;color:#ffffff;margin-bottom:12px;font-family:sans-serif;">
+          We've received your submission for ${merchantName}
+        </div>
+        <div style="font-size:14px;color:#888888;line-height:1.6;margin-bottom:24px;font-family:sans-serif;">
+          Your submission has been added to our system and is now under review. We'll reach out shortly with next steps.
+        </div>
+        <div style="background:#111111;border:1px solid #d4af37;border-radius:12px;padding:20px 24px;">
+          <div style="font-size:11px;font-weight:700;color:#d4af37;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Deal Reference</div>
+          <div style="font-size:15px;font-weight:700;color:#ffffff;font-family:monospace;">${dealId}</div>
+        </div>
+      </div>
+    </div>
+    <div style="text-align:center;font-size:12px;color:#333333;font-family:sans-serif;">
+      Powered by YoyoFunding &middot; Deal ID: ${dealId}
+    </div>
+  </div>
+</body>
+</html>`
+
+  const to = resolveRecipient(brokerEmail)
+  const ccList = buildCcList(ccEmails, brokerEmail)
+  console.log(`[email] sendSubmissionAckReply → to=${to} deal=${dealId}`)
+
+  return resend.emails.send({
+    from: FROM,
+    to,
+    ...(ccList.length > 0 ? { cc: ccList } : {}),
+    subject: reSubject(originalSubject),
+    headers: threadHeaders(originalMessageId),
+    html,
+  })
+}
+
+export async function sendApprovalThreadReply({
+  dealId,
+  brokerName,
+  brokerEmail,
+  merchantName,
+  originalMessageId,
+  originalSubject,
+  ccEmails,
+}: {
+  dealId: string
+  brokerName: string
+  brokerEmail: string
+  merchantName: string
+  originalMessageId: string
+  originalSubject: string
+  ccEmails: string[]
+}) {
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#111111;">
+  <div style="max-width:580px;margin:0 auto;padding:24px 16px 48px;">
+    ${testBanner(brokerEmail)}
+    ${logoHtml()}
+    <div style="background:#1c1c1c;border:1px solid #2a2a2a;border-radius:20px;overflow:hidden;margin-bottom:24px;">
+      <div style="background:#16a34a;padding:6px 20px;text-align:center;">
+        <span style="font-size:11px;font-weight:800;color:#ffffff;text-transform:uppercase;letter-spacing:0.12em;">Underwriting Approved</span>
+      </div>
+      <div style="padding:36px 32px;">
+        <div style="font-size:13px;color:#888888;margin-bottom:6px;font-family:sans-serif;">Hi ${brokerName},</div>
+        <div style="font-size:22px;font-weight:800;color:#ffffff;margin-bottom:12px;font-family:sans-serif;">
+          ${merchantName} — UW Approved
+        </div>
+        <div style="font-size:14px;color:#888888;line-height:1.6;margin-bottom:24px;font-family:sans-serif;">
+          Great news — this application has passed underwriting review and is approved to move forward.
+        </div>
+        <div style="background:#111111;border:1px solid #2a2a2a;border-radius:12px;padding:20px 24px;margin-bottom:16px;">
+          <div style="font-size:11px;font-weight:700;color:#888888;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;">Next Steps</div>
+          ${[
+            ['Agreement Signing', 'The merchant will receive a DocuSign agreement to review and sign.'],
+            ['Funding Call', 'Our team will schedule a funding call to confirm final details.'],
+            ['Disbursement', 'Funds will be disbursed following the completed funding call.'],
+          ].map(([title, desc], i) => `
+            <div style="display:flex;gap:12px;align-items:flex-start;${i > 0 ? 'margin-top:12px;' : ''}">
+              <div style="width:22px;height:22px;border-radius:50%;background:#d4af37;color:#111111;text-align:center;line-height:22px;font-weight:800;font-size:11px;flex-shrink:0;font-family:sans-serif;">${i + 1}</div>
+              <div>
+                <div style="font-size:13px;font-weight:700;color:#ffffff;font-family:sans-serif;">${title}</div>
+                <div style="font-size:12px;color:#666666;margin-top:2px;font-family:sans-serif;">${desc}</div>
+              </div>
+            </div>`).join('')}
+        </div>
+        <div style="background:#111111;border:1px solid #d4af37;border-radius:12px;padding:16px 20px;">
+          <div style="font-size:11px;font-weight:700;color:#d4af37;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">Deal Reference</div>
+          <div style="font-size:14px;font-weight:700;color:#ffffff;font-family:monospace;">${dealId}</div>
+        </div>
+      </div>
+    </div>
+    <div style="text-align:center;font-size:12px;color:#333333;font-family:sans-serif;">
+      Powered by YoyoFunding &middot; Deal ID: ${dealId}
+    </div>
+  </div>
+</body>
+</html>`
+
+  const to = resolveRecipient(brokerEmail)
+  const ccList = buildCcList(ccEmails, brokerEmail)
+  console.log(`[email] sendApprovalThreadReply → to=${to} deal=${dealId}`)
+
+  return resend.emails.send({
+    from: FROM,
+    to,
+    ...(ccList.length > 0 ? { cc: ccList } : {}),
+    subject: reSubject(originalSubject),
+    headers: threadHeaders(originalMessageId),
+    html,
+  })
+}
+
+export async function sendDeclineThreadReply({
+  dealId,
+  brokerName,
+  brokerEmail,
+  merchantName,
+  reason,
+  notes,
+  originalMessageId,
+  originalSubject,
+  ccEmails,
+}: {
+  dealId: string
+  brokerName: string
+  brokerEmail: string
+  merchantName: string
+  reason: string
+  notes?: string
+  originalMessageId: string
+  originalSubject: string
+  ccEmails: string[]
+}) {
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#111111;">
+  <div style="max-width:580px;margin:0 auto;padding:24px 16px 48px;">
+    ${testBanner(brokerEmail)}
+    ${logoHtml()}
+    <div style="background:#1c1c1c;border:1px solid #2a2a2a;border-radius:20px;overflow:hidden;margin-bottom:24px;">
+      <div style="background:#dc2626;padding:6px 20px;text-align:center;">
+        <span style="font-size:11px;font-weight:800;color:#ffffff;text-transform:uppercase;letter-spacing:0.12em;">Application Update</span>
+      </div>
+      <div style="padding:36px 32px;">
+        <div style="font-size:13px;color:#888888;margin-bottom:6px;font-family:sans-serif;">Hi ${brokerName},</div>
+        <div style="font-size:22px;font-weight:800;color:#ffffff;margin-bottom:12px;font-family:sans-serif;">
+          ${merchantName} — Application Declined
+        </div>
+        <div style="font-size:14px;color:#888888;line-height:1.6;margin-bottom:24px;font-family:sans-serif;">
+          After careful review, we are unable to approve funding for this application at this time.
+        </div>
+        <div style="background:#111111;border:1px solid #2a2a2a;border-radius:12px;padding:20px 24px;${notes ? 'margin-bottom:16px;' : ''}">
+          <div style="font-size:11px;font-weight:700;color:#888888;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Decline Reason</div>
+          <div style="font-size:15px;font-weight:700;color:#ffffff;">${reason}</div>
+        </div>
+        ${notes ? `
+        <div style="background:#111111;border:1px solid #2a2a2a;border-radius:12px;padding:20px 24px;">
+          <div style="font-size:11px;font-weight:700;color:#888888;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Additional Notes</div>
+          <div style="font-size:14px;color:#cccccc;line-height:1.6;">${notes}</div>
+        </div>` : ''}
+      </div>
+    </div>
+    <div style="text-align:center;font-size:12px;color:#333333;font-family:sans-serif;">
+      Powered by YoyoFunding &middot; Deal ID: ${dealId}
+    </div>
+  </div>
+</body>
+</html>`
+
+  const to = resolveRecipient(brokerEmail)
+  const ccList = buildCcList(ccEmails, brokerEmail)
+  console.log(`[email] sendDeclineThreadReply → to=${to} deal=${dealId}`)
+
+  return resend.emails.send({
+    from: FROM,
+    to,
+    ...(ccList.length > 0 ? { cc: ccList } : {}),
+    subject: reSubject(originalSubject),
+    headers: threadHeaders(originalMessageId),
+    html,
+  })
+}
