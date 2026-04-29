@@ -29,38 +29,55 @@ export async function POST(
 
   const merchantName = deal.merchantContact?.businessName ?? 'Merchant'
 
-  if (emailSub?.messageId) {
-    const brokerEmail = emailSub.fromEmail
-    const brokerName = emailSub.fromName || brokerEmail
-    sendDeclineThreadReply({
-      dealId: deal.id,
-      brokerName,
-      brokerEmail,
-      merchantName,
-      reason,
-      notes: notes || undefined,
-      originalMessageId: emailSub.messageId,
-      originalSubject: emailSub.subject ?? 'Your Submission',
-      ccEmails: emailSub.ccEmails,
-    }).catch(console.error)
-  } else if (deal.brokerContact) {
-    sendDeclineEmail({
-      dealId: deal.id,
-      brokerName: deal.brokerContact.name,
-      brokerEmail: deal.brokerContact.email,
-      merchantName,
-      reason,
-      notes: notes || undefined,
-    }).catch(console.error)
-  } else if (overrideEmail) {
-    sendDeclineEmail({
-      dealId: deal.id,
-      brokerName: 'Broker',
-      brokerEmail: overrideEmail,
-      merchantName,
-      reason,
-      notes: notes || undefined,
-    }).catch(console.error)
+  const apiKeyPreview = process.env.RESEND_API_KEY
+    ? process.env.RESEND_API_KEY.slice(0, 12) + '…'
+    : 'NOT SET'
+
+  try {
+    if (emailSub?.messageId) {
+      const brokerEmail = emailSub.fromEmail
+      const brokerName = emailSub.fromName || brokerEmail
+      console.log(`[decline] path=thread-reply to=${brokerEmail} deal=${deal.id} resend_key=${apiKeyPreview}`)
+      const result = await sendDeclineThreadReply({
+        dealId: deal.id,
+        brokerName,
+        brokerEmail,
+        merchantName,
+        reason,
+        notes: notes || undefined,
+        originalMessageId: emailSub.messageId,
+        originalSubject: emailSub.subject ?? 'Your Submission',
+        ccEmails: emailSub.ccEmails,
+      })
+      console.log(`[decline] thread-reply result:`, JSON.stringify(result))
+    } else if (deal.brokerContact) {
+      const brokerEmail = deal.brokerContact.email
+      console.log(`[decline] path=sendDeclineEmail to=${brokerEmail} deal=${deal.id} resend_key=${apiKeyPreview}`)
+      const result = await sendDeclineEmail({
+        dealId: deal.id,
+        brokerName: deal.brokerContact.name,
+        brokerEmail,
+        merchantName,
+        reason,
+        notes: notes || undefined,
+      })
+      console.log(`[decline] sendDeclineEmail result:`, JSON.stringify(result))
+    } else if (overrideEmail) {
+      console.log(`[decline] path=sendDeclineEmail(override) to=${overrideEmail} deal=${deal.id} resend_key=${apiKeyPreview}`)
+      const result = await sendDeclineEmail({
+        dealId: deal.id,
+        brokerName: 'Broker',
+        brokerEmail: overrideEmail,
+        merchantName,
+        reason,
+        notes: notes || undefined,
+      })
+      console.log(`[decline] sendDeclineEmail(override) result:`, JSON.stringify(result))
+    } else {
+      console.log(`[decline] path=no-email deal=${deal.id} — no broker contact, no emailSub, no overrideEmail`)
+    }
+  } catch (err) {
+    console.error(`[decline] email send failed deal=${deal.id}`, err)
   }
 
   return NextResponse.json(deal)
