@@ -2629,15 +2629,44 @@ export default function App() {
   const [merchantDeal, setMerchantDeal] = useState(null);
   const [uwDeal, setUwDeal] = useState(null);
   const [toast, setToast] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [secondsAgo, setSecondsAgo] = useState(0);
 
   const notify = (msg) => setToast(msg);
 
-  useEffect(() => {
+  const anyModalOpen = !!(selectedDeal || showNewDeal || showSubmission || declineDeal ||
+    createOfferDeal || assignBrokerDeal || brokerDeal || merchantDeal || uwDeal);
+
+  const fetchDeals = useCallback(() => {
     fetch('/api/deals')
       .then(r => r.json())
-      .then(data => { setDeals(Array.isArray(data) ? data.map(mapDeal) : []); setLoading(false); })
+      .then(data => {
+        setDeals(Array.isArray(data) ? data.map(mapDeal) : []);
+        setLoading(false);
+        setLastUpdated(new Date());
+        setSecondsAgo(0);
+      })
       .catch(() => setLoading(false));
   }, []);
+
+  // Initial load
+  useEffect(() => { fetchDeals(); }, [fetchDeals]);
+
+  // Auto-refresh every 30s — only on dashboard/deals, only when no modal is open
+  useEffect(() => {
+    if (!['dashboard', 'deals'].includes(view) || anyModalOpen) return;
+    const id = setInterval(fetchDeals, 30000);
+    return () => clearInterval(id);
+  }, [view, anyModalOpen, fetchDeals]);
+
+  // Tick the "X seconds ago" counter every second
+  useEffect(() => {
+    if (!lastUpdated) return;
+    const id = setInterval(() => {
+      setSecondsAgo(Math.floor((Date.now() - lastUpdated.getTime()) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [lastUpdated]);
 
   const updateDealStatus = (id, status) => {
     setDeals(ds => ds.map(d => d.id === id ? { ...d, status } : d));
@@ -2766,6 +2795,11 @@ export default function App() {
           <div className="topbar">
             <div className="topbar-title">{pageTitle[view]}</div>
             <div className="topbar-actions">
+              {lastUpdated && (view === 'dashboard' || view === 'deals') && (
+                <span style={{ fontSize: 11, color: 'var(--text-dim)', alignSelf: 'center', marginRight: 4 }}>
+                  Updated {secondsAgo < 5 ? 'just now' : secondsAgo < 60 ? `${secondsAgo}s ago` : `${Math.floor(secondsAgo / 60)}m ago`}
+                </span>
+              )}
               <button className="btn btn-secondary btn-sm" onClick={() => setShowSubmission(true)}>
                 <Icon name="plus" size={14} /> New Submission
               </button>
