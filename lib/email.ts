@@ -573,14 +573,21 @@ export async function sendDeclineThreadReply({
 
   const to = resolveRecipient(brokerEmail)
   const ccList = buildCcList(ccEmails, brokerEmail)
-  console.log(`[email] sendDeclineThreadReply → to=${to} deal=${dealId}`)
+  const threadHdrs = threadHeaders(originalMessageId)
+  console.log(
+    `[email] sendDeclineThreadReply → to=${to} deal=${dealId}`,
+    `| originalMessageId=${originalMessageId}`,
+    `| In-Reply-To=${threadHdrs['In-Reply-To']}`,
+    `| References=${threadHdrs['References']}`,
+    `| subject=${reSubject(originalSubject)}`
+  )
 
   return resend.emails.send({
     from: FROM,
     to,
     ...(ccList.length > 0 ? { cc: ccList } : {}),
     subject: reSubject(originalSubject),
-    headers: threadHeaders(originalMessageId),
+    headers: threadHdrs,
     html,
   })
 }

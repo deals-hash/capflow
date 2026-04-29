@@ -44,6 +44,7 @@ type PostmarkAddress = { Email: string; Name?: string; MailboxHash?: string }
 
 type PostmarkPayload = {
   MessageID?: string
+  Headers?: Array<{ Name: string; Value: string }>
   From?: string
   FromName?: string
   FromFull?: PostmarkAddress
@@ -78,7 +79,13 @@ export async function POST(request: NextRequest) {
   const fromEmail = body.FromFull?.Email ?? body.From ?? ''
   const fromName = body.FromName ?? body.FromFull?.Name ?? ''
   const subject = body.Subject ?? ''
-  const messageId = body.MessageID ?? ''
+  // Use the original email's Message-ID header for threading — body.MessageID is
+  // Postmark's internal UUID and won't match the sender's thread.
+  const originalMsgIdHeader = (body.Headers ?? []).find(
+    h => h.Name.toLowerCase() === 'message-id'
+  )?.Value ?? ''
+  const messageId = originalMsgIdHeader || body.MessageID || ''
+  console.log(`[inbound/email] raw MessageID=${body.MessageID} header Message-ID=${originalMsgIdHeader} stored=${messageId}`)
   const toEmails = (body.ToFull ?? []).map(a => a.Email).filter(Boolean)
   const ccEmails = (body.CcFull ?? []).map(a => a.Email).filter(Boolean)
   const rawAttachments = body.Attachments ?? []
