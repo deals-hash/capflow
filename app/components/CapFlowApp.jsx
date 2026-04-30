@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { useUser } from "@clerk/nextjs";
 import { usePlaidLink } from "react-plaid-link";
 
 // ─── MOCK DATA ────────────────────────────────────────────────────────────────
@@ -174,6 +175,7 @@ const Icon = ({ name, size = 16, color = "currentColor" }) => {
     chevronRight: <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />,
     copy: <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" />,
     notifications: <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />,
+    team: <><path stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fill="none" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.8" fill="none"/><path stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fill="none" d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
@@ -598,7 +600,7 @@ const Toast = ({ msg, onClose }) => {
 };
 
 // ─── DEAL DETAIL MODAL ───────────────────────────────────────────────────────
-const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOpenMerchant, onOpenUW, onDecline, onCreateOffer, onAssignBroker }) => {
+const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOpenMerchant, onOpenUW, onDecline, onCreateOffer, onAssignBroker, canManage = true, canDelete = true, canUWDecide = true }) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmRevert, setConfirmRevert] = useState(false);
   const [fullDeal, setFullDeal] = useState(null);
@@ -836,7 +838,7 @@ const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOp
           {/* Actions */}
           <div className="section-title mb-12">Actions</div>
           <div className="flex" style={{ gap: 8, flexWrap: "wrap" }}>
-            {deal.status === "Submission Received" && (
+            {deal.status === "Submission Received" && canManage && (
               <>
                 <button className="btn btn-green" onClick={() => { onClose(); onCreateOffer && onCreateOffer(deal); }}>
                   <Icon name="plus" size={15} /> Create Offer
@@ -846,7 +848,7 @@ const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOp
                 </button>
               </>
             )}
-            {deal.status === "Offer Created" && (
+            {deal.status === "Offer Created" && canManage && (
               <button className="btn btn-primary" onClick={() => { onUpdate(deal.id, "Offer Sent to Broker"); onClose(); }}>
                 <Icon name="send" size={15} /> Send Offer to Broker
               </button>
@@ -856,12 +858,12 @@ const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOp
                 <Icon name="eye" size={15} /> Preview Broker Link
               </button>
             )}
-            {deal.status === "Offer Sent to Broker" && (
+            {deal.status === "Offer Sent to Broker" && canManage && (
               <button className="btn btn-primary" onClick={() => { onUpdate(deal.id, "Offer Sent to Broker"); onClose(); }}>
                 <Icon name="send" size={15} /> Resend Broker Link
               </button>
             )}
-            {deal.status === "Offer Selected" && (
+            {deal.status === "Offer Selected" && canManage && (
               <button className="btn btn-primary" onClick={() => { onUpdate(deal.id, "Merchant Invited"); onClose(); }}>
                 <Icon name="send" size={15} /> Send Merchant Onboarding
               </button>
@@ -871,22 +873,22 @@ const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOp
                 <Icon name="eye" size={15} /> Preview Merchant Flow
               </button>
             )}
-            {deal.status === "Merchant Invited" && (
+            {deal.status === "Merchant Invited" && canManage && (
               <button className="btn btn-primary" onClick={() => { onUpdate(deal.id, "Merchant Invited"); onClose(); }}>
                 <Icon name="send" size={15} /> Resend Merchant Link
               </button>
             )}
-            {deal.status === "Ready for Final UW" && (
+            {deal.status === "Ready for Final UW" && canUWDecide && (
               <button className="btn btn-amber" onClick={() => onOpenUW(deal)}>
                 <Icon name="uw" size={15} /> Open UW Review
               </button>
             )}
-            {deal.status === "UW Approved" && !deal.fundingCallDone && (
+            {deal.status === "UW Approved" && !deal.fundingCallDone && canManage && (
               <button className="btn btn-green" onClick={() => { onUpdate(deal.id, "Funding Call Completed"); onClose(); }}>
                 <Icon name="check" size={15} /> Mark Funding Call Done
               </button>
             )}
-            {deal.status === "Funding Call Completed" && (
+            {deal.status === "Funding Call Completed" && canManage && (
               <button className="btn btn-green" onClick={() => { onUpdate(deal.id, "Funded"); onClose(); }}>
                 <Icon name="funded" size={15} /> Mark Funded
               </button>
@@ -894,7 +896,7 @@ const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOp
           </div>
 
           {/* Assign broker when none attached */}
-          {!deal.broker.email && (
+          {!deal.broker.email && canManage && (
             <>
               <div className="divider" />
               <button className="btn btn-secondary btn-sm" onClick={() => { onClose(); onAssignBroker && onAssignBroker(deal); }}>
@@ -903,37 +905,43 @@ const DealDetailModal = ({ deal, onClose, onUpdate, onDelete, onOpenBroker, onOp
             </>
           )}
 
-          <div className="divider" />
-
-          {/* Revert status */}
-          {PREV_STATUS[deal.status] && !confirmRevert && (
-            <button className="btn btn-secondary btn-sm" style={{ color: "var(--amber)" }} onClick={() => setConfirmRevert(true)}>
-              ↩ Revert to "{PREV_STATUS[deal.status]}"
-            </button>
+          {canManage && (
+            <>
+              <div className="divider" />
+              {PREV_STATUS[deal.status] && !confirmRevert && (
+                <button className="btn btn-secondary btn-sm" style={{ color: "var(--amber)" }} onClick={() => setConfirmRevert(true)}>
+                  ↩ Revert to "{PREV_STATUS[deal.status]}"
+                </button>
+              )}
+              {confirmRevert && (
+                <div className="flex items-center gap-8" style={{ background: "rgba(202,138,4,.06)", border: "1px solid rgba(202,138,4,.25)", borderRadius: 8, padding: "10px 14px", flexWrap: "wrap" }}>
+                  <span className="text-sm" style={{ color: "var(--amber)", flex: 1 }}>
+                    Revert <strong>{deal.id}</strong> to <strong>{PREV_STATUS[deal.status]}</strong>?
+                  </span>
+                  <button className="btn btn-secondary btn-sm" onClick={() => setConfirmRevert(false)}>Cancel</button>
+                  <button className="btn btn-amber btn-sm" onClick={() => { onUpdate(deal.id, PREV_STATUS[deal.status]); onClose(); }}>
+                    Confirm Revert
+                  </button>
+                </div>
+              )}
+            </>
           )}
-          {confirmRevert && (
-            <div className="flex items-center gap-8" style={{ background: "rgba(202,138,4,.06)", border: "1px solid rgba(202,138,4,.25)", borderRadius: 8, padding: "10px 14px", flexWrap: "wrap" }}>
-              <span className="text-sm" style={{ color: "var(--amber)", flex: 1 }}>
-                Revert <strong>{deal.id}</strong> to <strong>{PREV_STATUS[deal.status]}</strong>?
-              </span>
-              <button className="btn btn-secondary btn-sm" onClick={() => setConfirmRevert(false)}>Cancel</button>
-              <button className="btn btn-amber btn-sm" onClick={() => { onUpdate(deal.id, PREV_STATUS[deal.status]); onClose(); }}>
-                Confirm Revert
-              </button>
-            </div>
-          )}
 
-          <div className="divider" />
-          {!confirmDelete ? (
-            <button className="btn btn-red btn-sm" onClick={() => setConfirmDelete(true)}>
-              <Icon name="x" size={14} /> Delete Deal
-            </button>
-          ) : (
-            <div className="flex items-center gap-8" style={{ background: "rgba(220,38,38,.06)", border: "1px solid rgba(220,38,38,.25)", borderRadius: 8, padding: "10px 14px" }}>
-              <span className="text-sm" style={{ color: "var(--red)", flex: 1 }}>Delete <strong>{deal.id}</strong>? This cannot be undone.</span>
-              <button className="btn btn-secondary btn-sm" onClick={() => setConfirmDelete(false)}>Cancel</button>
-              <button className="btn btn-red btn-sm" onClick={() => { onDelete(deal.id); onClose(); }}>Confirm Delete</button>
-            </div>
+          {canDelete && (
+            <>
+              <div className="divider" />
+              {!confirmDelete ? (
+                <button className="btn btn-red btn-sm" onClick={() => setConfirmDelete(true)}>
+                  <Icon name="x" size={14} /> Delete Deal
+                </button>
+              ) : (
+                <div className="flex items-center gap-8" style={{ background: "rgba(220,38,38,.06)", border: "1px solid rgba(220,38,38,.25)", borderRadius: 8, padding: "10px 14px" }}>
+                  <span className="text-sm" style={{ color: "var(--red)", flex: 1 }}>Delete <strong>{deal.id}</strong>? This cannot be undone.</span>
+                  <button className="btn btn-secondary btn-sm" onClick={() => setConfirmDelete(false)}>Cancel</button>
+                  <button className="btn btn-red btn-sm" onClick={() => { onDelete(deal.id); onClose(); }}>Confirm Delete</button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -1564,7 +1572,7 @@ const MerchantView = ({ deal, onClose, onComplete }) => {
 };
 
 // ─── UW REVIEW MODAL ──────────────────────────────────────────────────────────
-const UWModal = ({ deal, onClose, onDecide }) => {
+const UWModal = ({ deal, onClose, onDecide, canUWDecide = true }) => {
   const offer = deal.offers.find(o => o.id === deal.selectedOffer) || deal.offers[0];
   const [fullDeal, setFullDeal] = useState(null);
   const [loadingArtifacts, setLoadingArtifacts] = useState(true);
@@ -1781,13 +1789,17 @@ const UWModal = ({ deal, onClose, onDecide }) => {
           </div>
         </div>
         <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-          <button className="btn btn-red" onClick={() => { onDecide(deal.id, "declined"); onClose(); }}>
-            <Icon name="x" size={14} /> Decline
-          </button>
-          <button className="btn btn-green" onClick={() => { onDecide(deal.id, "approved"); onClose(); }}>
-            <Icon name="check" size={14} /> Approve
-          </button>
+          <button className="btn btn-secondary" onClick={onClose}>{canUWDecide ? "Cancel" : "Close"}</button>
+          {canUWDecide && (
+            <>
+              <button className="btn btn-red" onClick={() => { onDecide(deal.id, "declined"); onClose(); }}>
+                <Icon name="x" size={14} /> Decline
+              </button>
+              <button className="btn btn-green" onClick={() => { onDecide(deal.id, "approved"); onClose(); }}>
+                <Icon name="check" size={14} /> Approve
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -1880,7 +1892,7 @@ const Dashboard = ({ deals, onSelectDeal }) => {
 };
 
 // ─── DEALS LIST ───────────────────────────────────────────────────────────────
-const DealsList = ({ deals, onSelectDeal, onNewDeal, onDeleteDeal }) => {
+const DealsList = ({ deals, onSelectDeal, onNewDeal, onDeleteDeal, canCreateDeals = true, canDelete = true }) => {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
 
@@ -1907,7 +1919,7 @@ const DealsList = ({ deals, onSelectDeal, onNewDeal, onDeleteDeal }) => {
             {STATUSES.map(s => <option key={s}>{s}</option>)}
           </select>
         </div>
-        <button className="btn btn-primary" onClick={onNewDeal}><Icon name="plus" size={15} /> New Deal</button>
+        {canCreateDeals && <button className="btn btn-primary" onClick={onNewDeal}><Icon name="plus" size={15} /> New Deal</button>}
       </div>
 
       <div className="card">
@@ -1921,7 +1933,7 @@ const DealsList = ({ deals, onSelectDeal, onNewDeal, onDeleteDeal }) => {
               <th>Amount</th>
               <th>Status</th>
               <th>Created</th>
-              <th></th>
+              {canDelete && <th></th>}
             </tr>
           </thead>
           <tbody>
@@ -1942,16 +1954,18 @@ const DealsList = ({ deals, onSelectDeal, onNewDeal, onDeleteDeal }) => {
                   <td><span className="mono fw-600">{fmt(o?.amount)}</span></td>
                   <td><StatusPill status={d.status} /></td>
                   <td><span className="text-dim text-xs mono">{d.created}</span></td>
-                  <td onClick={e => e.stopPropagation()}>
-                    <button className="btn btn-red btn-sm" onClick={() => onDeleteDeal(d.id)} title="Delete deal">
-                      <Icon name="x" size={13} />
-                    </button>
-                  </td>
+                  {canDelete && (
+                    <td onClick={e => e.stopPropagation()}>
+                      <button className="btn btn-red btn-sm" onClick={() => onDeleteDeal(d.id)} title="Delete deal">
+                        <Icon name="x" size={13} />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               );
             })}
             {filtered.length === 0 && (
-              <tr><td colSpan={7} style={{ textAlign: "center", padding: 32, color: "var(--text3)" }}>No deals found</td></tr>
+              <tr><td colSpan={canDelete ? 8 : 7} style={{ textAlign: "center", padding: 32, color: "var(--text3)" }}>No deals found</td></tr>
             )}
           </tbody>
         </table>
@@ -2614,11 +2628,187 @@ const SubmissionModal = ({ onClose, onCreate }) => {
   );
 };
 
+// ─── TEAM VIEW ───────────────────────────────────────────────────────────────
+const ROLE_LABELS = { Admin: 'Admin', Underwriter: 'Underwriter', BackOffice: 'Back Office', ViewOnly: 'View Only' };
+const ROLE_COLORS = { Admin: 'var(--accent)', Underwriter: 'var(--amber)', BackOffice: '#3b82f6', ViewOnly: 'var(--text3)' };
+
+const TeamView = ({ currentUserId }) => {
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteName, setInviteName] = useState('');
+  const [inviteRole, setInviteRole] = useState('ViewOnly');
+  const [inviting, setInviting] = useState(false);
+  const [inviteError, setInviteError] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const loadMembers = () => {
+    setLoading(true);
+    fetch('/api/team').then(r => r.json()).then(d => { setMembers(Array.isArray(d) ? d : []); setLoading(false); }).catch(() => setLoading(false));
+  };
+
+  useEffect(() => { loadMembers(); }, []);
+
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) { setInviteError('Email is required.'); return; }
+    setInviting(true); setInviteError(null);
+    try {
+      const res = await fetch('/api/team/invite', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: inviteEmail.trim(), name: inviteName.trim() || inviteEmail.trim(), role: inviteRole }) });
+      const data = await res.json();
+      if (!res.ok) { setInviteError(data.error ?? 'Failed to invite.'); setInviting(false); return; }
+      setMembers(ms => { const exists = ms.find(m => m.id === data.id); return exists ? ms.map(m => m.id === data.id ? data : m) : [...ms, data]; });
+      setShowInvite(false); setInviteEmail(''); setInviteName(''); setInviteRole('ViewOnly');
+      setToast('Invitation sent!');
+    } catch { setInviteError('Network error.'); }
+    setInviting(false);
+  };
+
+  const handleRoleChange = async (id, role) => {
+    const prev = members.find(m => m.id === id);
+    setMembers(ms => ms.map(m => m.id === id ? { ...m, role } : m));
+    const res = await fetch(`/api/team/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) });
+    if (!res.ok) { setMembers(ms => ms.map(m => m.id === id ? prev : m)); setToast('Failed to update role.'); }
+    else setToast('Role updated.');
+  };
+
+  const handleRemove = async (id) => {
+    if (!window.confirm('Remove this team member?')) return;
+    const prev = members;
+    setMembers(ms => ms.filter(m => m.id !== id));
+    const res = await fetch(`/api/team/${id}`, { method: 'DELETE' });
+    if (!res.ok) { setMembers(prev); setToast('Failed to remove member.'); }
+    else setToast('Member removed.');
+  };
+
+  return (
+    <div className="fade-in">
+      {toast && <Toast msg={toast} onClose={() => setToast(null)} />}
+      <div className="flex justify-between items-center mb-16">
+        <div />
+        <button className="btn btn-primary" onClick={() => setShowInvite(true)}><Icon name="plus" size={15} /> Invite Member</button>
+      </div>
+
+      {showInvite && (
+        <div className="modal-overlay" onClick={() => setShowInvite(false)}>
+          <div className="modal" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div><div className="modal-title">Invite Team Member</div><div className="modal-sub">They'll receive a Clerk invitation email</div></div>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowInvite(false)}><Icon name="x" size={14} /></button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group"><label className="form-label">Email</label><input className="form-input" type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="colleague@company.com" /></div>
+              <div className="form-group"><label className="form-label">Name <span className="text-dim">(optional)</span></label><input className="form-input" value={inviteName} onChange={e => setInviteName(e.target.value)} placeholder="Jane Smith" /></div>
+              <div className="form-group">
+                <label className="form-label">Role</label>
+                <select className="form-input" value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
+                  <option value="Admin">Admin — full access</option>
+                  <option value="Underwriter">Underwriter — approve/decline UW only</option>
+                  <option value="BackOffice">Back Office — create deals, update statuses</option>
+                  <option value="ViewOnly">View Only — read only</option>
+                </select>
+              </div>
+              {inviteError && <div style={{ color: 'var(--red)', fontSize: 13 }}>{inviteError}</div>}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowInvite(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleInvite} disabled={inviting}><Icon name="send" size={14} /> {inviting ? 'Sending…' : 'Send Invite'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="card">
+        <div className="section-header mb-16">
+          <div className="section-title">Team Members</div>
+          <span className="tag" style={{ background: 'rgba(22,163,74,.1)', color: 'var(--accent)' }}>{members.length} member{members.length !== 1 ? 's' : ''}</span>
+        </div>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 32, color: 'var(--text3)' }}>Loading…</div>
+        ) : (
+          <table className="table">
+            <thead>
+              <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
+              {members.map(m => {
+                const isMe = m.clerkUserId === currentUserId;
+                return (
+                  <tr key={m.id} style={{ cursor: 'default' }}>
+                    <td>
+                      <div className="flex items-center gap-8">
+                        <div style={{ width: 30, height: 30, borderRadius: '50%', background: `linear-gradient(135deg, ${ROLE_COLORS[m.role] ?? 'var(--accent)'}, var(--accent2))`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                          {(m.name || m.email).charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="fw-600 text-sm">{m.name}</div>
+                          {isMe && <div className="text-xs" style={{ color: 'var(--accent)' }}>You</div>}
+                        </div>
+                      </div>
+                    </td>
+                    <td><span className="mono text-xs text-dim">{m.email || '—'}</span></td>
+                    <td>
+                      {isMe ? (
+                        <span className="tag" style={{ background: (ROLE_COLORS[m.role] ?? 'var(--accent)') + '20', color: ROLE_COLORS[m.role] ?? 'var(--accent)' }}>{ROLE_LABELS[m.role] ?? m.role}</span>
+                      ) : (
+                        <select
+                          className="form-input"
+                          style={{ width: 'auto', padding: '4px 8px', fontSize: 12 }}
+                          value={m.role}
+                          onChange={e => handleRoleChange(m.id, e.target.value)}
+                        >
+                          <option value="Admin">Admin</option>
+                          <option value="Underwriter">Underwriter</option>
+                          <option value="BackOffice">Back Office</option>
+                          <option value="ViewOnly">View Only</option>
+                        </select>
+                      )}
+                    </td>
+                    <td>
+                      <span className="tag" style={{ background: m.clerkUserId ? 'rgba(22,163,74,.1)' : 'rgba(202,138,4,.1)', color: m.clerkUserId ? 'var(--green)' : 'var(--amber)', fontSize: 11 }}>
+                        {m.clerkUserId ? 'Active' : 'Invited'}
+                      </span>
+                    </td>
+                    <td>
+                      {!isMe && (
+                        <button className="btn btn-red btn-sm" onClick={() => handleRemove(m.id)} title="Remove member">
+                          <Icon name="x" size={13} />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
-export default function App() {
+export default function App({ initialView = "dashboard" }) {
+  const { user: clerkUser } = useUser();
+  const [userRole, setUserRole] = useState(null);
+  const [userRoleRecord, setUserRoleRecord] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/team/me').then(r => r.json()).then(d => { setUserRole(d.role ?? 'ViewOnly'); setUserRoleRecord(d); }).catch(() => {});
+  }, []);
+
+  const canCreateDeals = userRole === 'Admin' || userRole === 'BackOffice';
+  const canManage      = userRole === 'Admin' || userRole === 'BackOffice' || userRole === 'Underwriter';
+  const canUWDecide    = userRole === 'Admin' || userRole === 'Underwriter';
+  const canDelete      = userRole === 'Admin';
+
+  const displayName = clerkUser?.fullName || clerkUser?.firstName || userRoleRecord?.name || 'User';
+  const displayInitials = displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const displayRole = ROLE_LABELS[userRole] ?? userRole ?? '…';
+
   const [deals, setDeals] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState("dashboard");
+  const [view, setView] = useState(initialView);
   const [selectedDeal, setSelectedDeal] = useState(null);
   const [showNewDeal, setShowNewDeal] = useState(false);
   const [showSubmission, setShowSubmission] = useState(false);
@@ -2746,9 +2936,10 @@ export default function App() {
     { id: "uwqueue", label: "UW Queue", icon: "uw", badge: uwCount > 0 ? uwCount : null },
     { id: "alerts", label: "Alerts", icon: "notifications" },
     { id: "brokers", label: "Broker Shops", icon: "funded", href: "/broker-shops" },
+    { id: "team", label: "Team", icon: "team" },
   ];
 
-  const pageTitle = { dashboard: "Dashboard", deals: "All Deals", uwqueue: "UW Queue", alerts: "Alerts" };
+  const pageTitle = { dashboard: "Dashboard", deals: "All Deals", uwqueue: "UW Queue", alerts: "Alerts", team: "Team" };
 
   return (
     <>
@@ -2781,10 +2972,10 @@ export default function App() {
           </nav>
           <div className="sidebar-footer">
             <div className="user-row">
-              <div className="avatar">JD</div>
+              <div className="avatar">{displayInitials}</div>
               <div>
-                <div style={{ fontWeight: 600, color: "var(--text2)", fontSize: 12 }}>Jane Doe</div>
-                <div style={{ fontSize: 10, color: "var(--text3)" }}>Internal Ops</div>
+                <div style={{ fontWeight: 600, color: "var(--text2)", fontSize: 12 }}>{displayName}</div>
+                <div style={{ fontSize: 10, color: "var(--text3)" }}>{displayRole}</div>
               </div>
             </div>
           </div>
@@ -2796,18 +2987,24 @@ export default function App() {
             <div className="topbar-title">{pageTitle[view]}</div>
             <div className="topbar-actions">
               {lastUpdated && (view === 'dashboard' || view === 'deals') && (
-                <span style={{ fontSize: 11, color: 'var(--text-dim)', alignSelf: 'center', marginRight: 4 }}>
+                <span style={{ fontSize: 11, color: 'var(--text3)', alignSelf: 'center', marginRight: 4 }}>
                   Updated {secondsAgo < 5 ? 'just now' : secondsAgo < 60 ? `${secondsAgo}s ago` : `${Math.floor(secondsAgo / 60)}m ago`}
                 </span>
               )}
-              <button className="btn btn-secondary btn-sm" onClick={() => setShowSubmission(true)}>
-                <Icon name="plus" size={14} /> New Submission
-              </button>
-              {view === "deals" && (
+              {canCreateDeals && (
+                <button className="btn btn-secondary btn-sm" onClick={() => setShowSubmission(true)}>
+                  <Icon name="plus" size={14} /> New Submission
+                </button>
+              )}
+              {view === "deals" && canCreateDeals && (
                 <button className="btn btn-primary btn-sm" onClick={() => setShowNewDeal(true)}>
                   <Icon name="plus" size={14} /> New Deal
                 </button>
               )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 4, padding: '4px 10px', background: 'var(--surface2)', borderRadius: 20, border: '1px solid var(--border)' }}>
+                <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent2), #14532d)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff' }}>{displayInitials}</div>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)' }}>{displayName}</span>
+              </div>
             </div>
           </div>
           <div className="content scrollbar">
@@ -2818,9 +3015,10 @@ export default function App() {
             ) : (
               <>
                 {view === "dashboard" && <Dashboard deals={deals} onSelectDeal={d => { setSelectedDeal(d); }} />}
-                {view === "deals" && <DealsList deals={deals} onSelectDeal={d => setSelectedDeal(d)} onNewDeal={() => setShowNewDeal(true)} onDeleteDeal={deleteDeal} />}
+                {view === "deals" && <DealsList deals={deals} onSelectDeal={d => setSelectedDeal(d)} onNewDeal={() => setShowNewDeal(true)} onDeleteDeal={deleteDeal} canCreateDeals={canCreateDeals} canDelete={canDelete} />}
                 {view === "uwqueue" && <UWQueue deals={deals} onOpen={d => setUwDeal(d)} />}
                 {view === "alerts" && <NotificationsPanel deals={deals} />}
+                {view === "team" && <TeamView currentUserId={userRoleRecord?.clerkUserId} />}
               </>
             )}
           </div>
@@ -2840,6 +3038,9 @@ export default function App() {
           onDecline={d => { setSelectedDeal(null); setDeclineDeal(d); }}
           onCreateOffer={d => { setSelectedDeal(null); setCreateOfferDeal(d); }}
           onAssignBroker={d => { setSelectedDeal(null); setAssignBrokerDeal(d); }}
+          canManage={canManage}
+          canDelete={canDelete}
+          canUWDecide={canUWDecide}
         />
       )}
       {showNewDeal && (
@@ -2894,6 +3095,7 @@ export default function App() {
           deal={deals.find(d => d.id === uwDeal.id) || uwDeal}
           onClose={() => setUwDeal(null)}
           onDecide={handleUWDecide}
+          canUWDecide={canUWDecide}
         />
       )}
       {toast && <Toast msg={toast} onClose={() => setToast(null)} />}

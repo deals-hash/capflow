@@ -175,6 +175,15 @@ model UnderwritingDecision {
   notes       String?
 }
 
+model UserRole {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  clerkUserId String?  @unique
+  email       String   @unique
+  name        String
+  role        String   @default("ViewOnly")
+}
+
 model EmailSubmission {
   id          String   @id @default(cuid())
   createdAt   DateTime @default(now())
